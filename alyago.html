@@ -138,8 +138,8 @@
         /* Kamera çerçevesi */
         .camera-frame {
             position: relative;
-            width: 300px;
-            height: 300px;
+            width: 250px;
+            height: 320px;
             margin: 0 auto;
         }
 
@@ -504,6 +504,106 @@
             }
         };
 
+        // Karakter Türleri Veritabanı
+        const characterTypes = [
+            {
+                id: 'teddy',
+                name: 'Oyuncak Ayı',
+                emoji: '🧸',
+                colors: { primary: '#FF6B9D', secondary: '#FF85B3', accent: '#FFB6D9' }
+            },
+            {
+                id: 'robot',
+                name: 'Robot',
+                emoji: '🤖',
+                colors: { primary: '#6B9DFF', secondary: '#85B3FF', accent: '#B6D9FF' }
+            },
+            {
+                id: 'alien',
+                name: 'Uzaylı',
+                emoji: '👽',
+                colors: { primary: '#7FFF00', secondary: '#9AFF4D', accent: '#CCFF99' }
+            },
+            {
+                id: 'superhero',
+                name: 'Süper Kahraman',
+                emoji: '🦸',
+                colors: { primary: '#FF4444', secondary: '#FF6666', accent: '#FFB3B3' }
+            },
+            {
+                id: 'ninja',
+                name: 'Ninja',
+                emoji: '🥷',
+                colors: { primary: '#2C2C2C', secondary: '#444444', accent: '#666666' }
+            },
+            {
+                id: 'unicorn',
+                name: 'Unicorn',
+                emoji: '🦄',
+                colors: { primary: '#FF00FF', secondary: '#FF4DFF', accent: '#FFB3FF' }
+            },
+            {
+                id: 'dragon',
+                name: 'Ejderha',
+                emoji: '🐉',
+                colors: { primary: '#FF6600', secondary: '#FF8533', accent: '#FFB380' }
+            },
+            {
+                id: 'mermaid',
+                name: 'Deniz Kızı',
+                emoji: '🧜',
+                colors: { primary: '#00CED1', secondary: '#20E0E3', accent: '#80F0F3' }
+            },
+            {
+                id: 'wizard',
+                name: 'Büyücü',
+                emoji: '🧙',
+                colors: { primary: '#8B00FF', secondary: '#A333FF', accent: '#D199FF' }
+            },
+            {
+                id: 'astronaut',
+                name: 'Astronot',
+                emoji: '🧑‍🚀',
+                colors: { primary: '#FFFFFF', secondary: '#E0E0E0', accent: '#C0C0C0' }
+            },
+            {
+                id: 'pirate',
+                name: 'Korsan',
+                emoji: '🏴‍☠️',
+                colors: { primary: '#8B4513', secondary: '#A0522D', accent: '#D2691E' }
+            },
+            {
+                id: 'fairy',
+                name: 'Peri',
+                emoji: '🧚',
+                colors: { primary: '#FFD700', secondary: '#FFE44D', accent: '#FFF099' }
+            },
+            {
+                id: 'dinosaur',
+                name: 'Dinozor',
+                emoji: '🦕',
+                colors: { primary: '#228B22', secondary: '#32CD32', accent: '#90EE90' }
+            },
+            {
+                id: 'bee',
+                name: 'Arı',
+                emoji: '🐝',
+                colors: { primary: '#FFD700', secondary: '#000000', accent: '#FFF8DC' }
+            },
+            {
+                id: 'cat',
+                name: 'Kedi',
+                emoji: '🐱',
+                colors: { primary: '#FFA500', secondary: '#FFB84D', accent: '#FFDDB3' }
+            },
+            {
+                id: 'dog',
+                name: 'Köpek',
+                emoji: '🐶',
+                colors: { primary: '#8B4513', secondary: '#CD853F', accent: '#DEB887' }
+            }
+        ];
+
         // Ana Uygulama Bileşeni
         function AlyaGoApp() {
             const [userProfile, setUserProfile] = useState(null); // 'child' veya 'adult'
@@ -512,6 +612,7 @@
             const [currentUnit, setCurrentUnit] = useState(null);
             const [currentLesson, setCurrentLesson] = useState(null);
             const [characterPhoto, setCharacterPhoto] = useState(null); // Çocuk karakteri fotoğrafı
+            const [selectedCharacter, setSelectedCharacter] = useState(characterTypes[0]); // Seçili karakter tipi
             const [characterPosition, setCharacterPosition] = useState({ x: 20, y: 20 }); // Karakter pozisyonu
             const [userProgress, setUserProgress] = useState({
                 totalXP: 0,
@@ -616,15 +717,65 @@
                 </div>
             );
 
+            // SVG Karakter Vücudu Bileşeni
+            const CharacterBody = ({ character, size = 'normal', showAnimations = true }) => {
+                const width = size === 'large' ? 200 : 140;
+                const height = size === 'large' ? 280 : 200;
+                const colors = character.colors;
+
+                const scale = size === 'large' ? 1 : 0.7;
+
+                return (
+                    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className={showAnimations ? 'character-body-svg' : ''}>
+                        {/* Gövde */}
+                        <ellipse cx={width/2} cy={height*0.64} rx={60*scale} ry={70*scale} fill={colors.primary} />
+                        <ellipse cx={width/2} cy={height*0.64} rx={50*scale} ry={60*scale} fill={colors.secondary} />
+
+                        {/* Bacaklar */}
+                        <g className={showAnimations ? 'leg-left' : ''}>
+                            <ellipse cx={width/2 - 25*scale} cy={height*0.857} rx={18*scale} ry={35*scale} fill={colors.primary} />
+                            <circle cx={width/2 - 25*scale} cy={height*0.964} r={15*scale} fill={colors.accent} />
+                        </g>
+                        <g className={showAnimations ? 'leg-right' : ''}>
+                            <ellipse cx={width/2 + 25*scale} cy={height*0.857} rx={18*scale} ry={35*scale} fill={colors.primary} />
+                            <circle cx={width/2 + 25*scale} cy={height*0.964} r={15*scale} fill={colors.accent} />
+                        </g>
+
+                        {/* Boyun */}
+                        <rect x={width/2 - 15*scale} y={height*0.429} width={30*scale} height={25*scale} rx={15*scale} fill="#FFCC99" />
+
+                        {/* Kollar */}
+                        <g className={showAnimations ? 'arm-left' : ''}>
+                            <ellipse cx={width/2 - 50*scale} cy={height*0.571} rx={15*scale} ry={45*scale} fill={colors.secondary} transform={`rotate(-20 ${width/2 - 50*scale} ${height*0.571})`} />
+                            <circle cx={width/2 - 58*scale} cy={height*0.679} r={12*scale} fill={colors.accent} />
+                        </g>
+                        <g className={showAnimations ? 'arm-right' : ''}>
+                            <ellipse cx={width/2 + 50*scale} cy={height*0.571} rx={15*scale} ry={45*scale} fill={colors.secondary} transform={`rotate(20 ${width/2 + 50*scale} ${height*0.571})`} />
+                            <circle cx={width/2 + 58*scale} cy={height*0.679} r={12*scale} fill={colors.accent} />
+                        </g>
+
+                        {/* Göbek Detayı */}
+                        <circle cx={width/2} cy={height*0.661} r={8*scale} fill={colors.accent} opacity="0.5" />
+
+                        {/* Düğmeler */}
+                        <circle cx={width/2} cy={height*0.589} r={5*scale} fill="#FFF" />
+                        <circle cx={width/2} cy={height*0.643} r={5*scale} fill="#FFF" />
+                        <circle cx={width/2} cy={height*0.696} r={5*scale} fill="#FFF" />
+                    </svg>
+                );
+            };
+
             // Karakter Oluşturma Ekranı (Sadece Çocuk Profili)
             const CharacterCreateScreen = () => {
                 const [stream, setStream] = useState(null);
                 const [capturedPhoto, setCapturedPhoto] = useState(null);
+                const [videoReady, setVideoReady] = useState(false);
                 const videoRef = React.useRef(null);
                 const canvasRef = React.useRef(null);
 
                 const startCamera = async () => {
                     try {
+                        setVideoReady(false);
                         const mediaStream = await navigator.mediaDevices.getUserMedia({
                             video: {
                                 facingMode: 'user',
@@ -635,6 +786,14 @@
                         setStream(mediaStream);
                         if (videoRef.current) {
                             videoRef.current.srcObject = mediaStream;
+
+                            // Video yüklendiğinde ready durumuna geç
+                            videoRef.current.onloadedmetadata = () => {
+                                videoRef.current.play();
+                                setTimeout(() => {
+                                    setVideoReady(true);
+                                }, 500); // Kameranın stabilize olması için kısa bir bekleme
+                            };
                         }
                     } catch (error) {
                         alert('Kamera erişimi reddedildi. Lütfen tarayıcı ayarlarından kamera iznini verin.');
@@ -643,24 +802,35 @@
                 };
 
                 const capturePhoto = () => {
+                    if (!videoReady) {
+                        alert('Lütfen kameranın hazır olmasını bekleyin...');
+                        return;
+                    }
+
                     if (videoRef.current && canvasRef.current) {
                         const canvas = canvasRef.current;
                         const video = videoRef.current;
                         const context = canvas.getContext('2d');
 
-                        canvas.width = 300;
-                        canvas.height = 300;
+                        // Video'nun gerçekten görüntü içerip içermediğini kontrol et
+                        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                            canvas.width = 250;
+                            canvas.height = 320;
 
-                        // Videoyu canvas'a çiz
-                        context.drawImage(video, 0, 0, 300, 300);
+                            // Videoyu canvas'a çiz
+                            context.drawImage(video, 0, 0, 250, 320);
 
-                        // Data URL olarak al
-                        const photoData = canvas.toDataURL('image/png');
-                        setCapturedPhoto(photoData);
+                            // Data URL olarak al
+                            const photoData = canvas.toDataURL('image/png');
+                            setCapturedPhoto(photoData);
 
-                        // Kamerayı kapat
-                        if (stream) {
-                            stream.getTracks().forEach(track => track.stop());
+                            // Kamerayı kapat
+                            if (stream) {
+                                stream.getTracks().forEach(track => track.stop());
+                            }
+                            setVideoReady(false);
+                        } else {
+                            alert('Kamera henüz hazır değil. Lütfen birkaç saniye bekleyin.');
                         }
                     }
                 };
@@ -670,12 +840,12 @@
                     startCamera();
                 };
 
-                const saveCharacter = () => {
+                const goToCharacterSelection = () => {
                     setCharacterPhoto(capturedPhoto);
                     if (stream) {
                         stream.getTracks().forEach(track => track.stop());
                     }
-                    setCurrentScreen('home');
+                    setCurrentScreen('character-select');
                 };
 
                 const skipCharacter = () => {
@@ -746,14 +916,24 @@
                                             </div>
                                             <div className="text-center">
                                                 <p className="text-lg font-semibold text-purple-600 mb-4">
-                                                    Yüzünü çemberin içine getir! 😊
+                                                    {videoReady ? 'Yüzünü çemberin içine getir! 😊' : 'Kamera hazırlanıyor... ⏳'}
                                                 </p>
+                                                {!videoReady && (
+                                                    <div className="mb-4">
+                                                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-purple-500 border-t-transparent"></div>
+                                                    </div>
+                                                )}
                                             </div>
                                             <button
                                                 onClick={capturePhoto}
-                                                className="w-full bg-gradient-to-r from-green-500 to-blue-500 text-white py-4 rounded-xl font-bold text-xl hover:from-green-600 hover:to-blue-600 transition transform hover:scale-105"
+                                                disabled={!videoReady}
+                                                className={`w-full py-4 rounded-xl font-bold text-xl transition transform ${
+                                                    videoReady
+                                                        ? 'bg-gradient-to-r from-green-500 to-blue-500 text-white hover:from-green-600 hover:to-blue-600 hover:scale-105 cursor-pointer'
+                                                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                }`}
                                             >
-                                                ✨ Fotoğrafı Çek!
+                                                {videoReady ? '✨ Fotoğrafı Çek!' : '⏳ Lütfen Bekleyin...'}
                                             </button>
                                             <button
                                                 onClick={skipCharacter}
@@ -840,14 +1020,128 @@
                                             🔄 Tekrar Çek
                                         </button>
                                         <button
-                                            onClick={saveCharacter}
+                                            onClick={goToCharacterSelection}
                                             className="flex-1 bg-gradient-to-r from-green-500 to-blue-500 text-white py-3 rounded-xl font-bold hover:from-green-600 hover:to-blue-600 transition"
                                         >
-                                            ✅ Kaydet & Başla!
+                                            ✅ Devam →
                                         </button>
                                     </div>
                                 </div>
                             )}
+                        </div>
+                    </div>
+                );
+            };
+
+            // Karakter Seçim Ekranı
+            const CharacterSelectScreen = () => {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-indigo-200 via-purple-200 to-pink-200 p-4">
+                        <div className="max-w-7xl mx-auto py-8">
+                            <div className="text-center mb-8 fade-in">
+                                <h1 className="text-5xl font-bold text-purple-700 mb-3">🎭 Karakterini Seç!</h1>
+                                <p className="text-xl text-gray-700">Hangi karakter olmak istersin?</p>
+                            </div>
+
+                            {/* Karakter Grid */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4 mb-8">
+                                {characterTypes.map((char) => (
+                                    <div
+                                        key={char.id}
+                                        onClick={() => setSelectedCharacter(char)}
+                                        className={`bg-white rounded-2xl p-6 cursor-pointer transform transition hover:scale-105 ${
+                                            selectedCharacter.id === char.id
+                                                ? 'ring-4 ring-purple-500 shadow-2xl scale-105'
+                                                : 'shadow-lg hover:shadow-xl'
+                                        }`}
+                                    >
+                                        <div className="text-center">
+                                            <div className="text-6xl mb-3">{char.emoji}</div>
+                                            <h3 className="font-bold text-lg mb-2">{char.name}</h3>
+
+                                            {/* Mini Önizleme */}
+                                            <div className="relative inline-block" style={{ width: '80px', height: '120px' }}>
+                                                <CharacterBody character={char} size="normal" showAnimations={false} />
+                                                {characterPhoto && (
+                                                    <div style={{
+                                                        position: 'absolute',
+                                                        top: '2px',
+                                                        left: '50%',
+                                                        transform: 'translateX(-50%)',
+                                                        zIndex: 10
+                                                    }}>
+                                                        <img
+                                                            src={characterPhoto}
+                                                            alt="Preview"
+                                                            style={{
+                                                                width: '42px',
+                                                                height: '42px',
+                                                                borderRadius: '50%',
+                                                                border: '3px solid #fff',
+                                                                objectFit: 'cover',
+                                                                boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                                                            }}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Seçili Karakter Büyük Önizleme */}
+                            <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-2xl mx-auto fade-in">
+                                <div className="text-center">
+                                    <h2 className="text-3xl font-bold text-purple-600 mb-6">
+                                        ✨ Seçtiğin Karakter: {selectedCharacter.name} {selectedCharacter.emoji}
+                                    </h2>
+
+                                    <div className="inline-block relative character-body mb-6">
+                                        <CharacterBody character={selectedCharacter} size="large" showAnimations={true} />
+                                        {characterPhoto && (
+                                            <div style={{
+                                                position: 'absolute',
+                                                top: '5px',
+                                                left: '50%',
+                                                transform: 'translateX(-50%)',
+                                                zIndex: 10
+                                            }}>
+                                                <img
+                                                    src={characterPhoto}
+                                                    alt="Karakter"
+                                                    className="character-face"
+                                                    style={{
+                                                        width: '100px',
+                                                        height: '100px',
+                                                        objectFit: 'cover',
+                                                        display: 'block'
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <p className="text-lg text-gray-600 mb-6">
+                                        Harika görünüyor! Bu karakterinle maceraya hazır mısın?
+                                    </p>
+
+                                    <div className="flex gap-4">
+                                        <button
+                                            onClick={() => setCurrentScreen('character-create')}
+                                            className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-400 transition"
+                                        >
+                                            ← Geri
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentScreen('home')}
+                                            className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-bold hover:from-purple-600 hover:to-pink-600 transition transform hover:scale-105"
+                                        >
+                                            🚀 Oyuna Başla!
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 );
@@ -875,13 +1169,22 @@
                                 </button>
                                 <div className="flex items-center gap-3">
                                     {isChild && (
-                                        <button
-                                            onClick={() => setCurrentScreen('character-create')}
-                                            className="px-4 py-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 transition text-sm"
-                                            title="Karakterini Değiştir"
-                                        >
-                                            {characterPhoto ? '🎨 Karakterini Değiştir' : '🎨 Karakter Oluştur'}
-                                        </button>
+                                        <>
+                                            <button
+                                                onClick={() => setCurrentScreen('character-select')}
+                                                className="px-4 py-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 transition text-sm"
+                                                title="Karakter Değiştir"
+                                            >
+                                                🎭 Karakter Değiştir
+                                            </button>
+                                            <button
+                                                onClick={() => setCurrentScreen('character-create')}
+                                                className="px-4 py-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 transition text-sm"
+                                                title="Fotoğraf Değiştir"
+                                            >
+                                                📸 Fotoğraf Değiştir
+                                            </button>
+                                        </>
                                     )}
                                     <div className="text-2xl">{isChild ? '👶' : '👔'}</div>
                                 </div>
@@ -1860,43 +2163,7 @@
                         }}
                     >
                         <div className="character-body" style={{ position: 'relative', width: '140px', height: '200px' }}>
-                            {/* SVG Vücut */}
-                            <svg width="140" height="200" viewBox="0 0 140 200" className="character-body-svg" style={{ position: 'absolute', top: 0, left: 0 }}>
-                                {/* Gövde */}
-                                <ellipse cx="70" cy="125" rx="42" ry="50" fill="#FF6B9D" />
-                                <ellipse cx="70" cy="125" rx="35" ry="42" fill="#FF85B3" />
-
-                                {/* Bacaklar */}
-                                <g className="leg-left">
-                                    <ellipse cx="52" cy="165" rx="13" ry="25" fill="#FF6B9D" />
-                                    <circle cx="52" cy="188" r="11" fill="#FFB6D9" />
-                                </g>
-                                <g className="leg-right">
-                                    <ellipse cx="88" cy="165" rx="13" ry="25" fill="#FF6B9D" />
-                                    <circle cx="88" cy="188" r="11" fill="#FFB6D9" />
-                                </g>
-
-                                {/* Boyun */}
-                                <rect x="59" y="85" width="22" height="18" rx="11" fill="#FFCC99" />
-
-                                {/* Kollar */}
-                                <g className="arm-left">
-                                    <ellipse cx="35" cy="110" rx="11" ry="32" fill="#FF85B3" transform="rotate(-20 35 110)" />
-                                    <circle cx="29" cy="132" r="9" fill="#FFB6D9" />
-                                </g>
-                                <g className="arm-right">
-                                    <ellipse cx="105" cy="110" rx="11" ry="32" fill="#FF85B3" transform="rotate(20 105 110)" />
-                                    <circle cx="111" cy="132" r="9" fill="#FFB6D9" />
-                                </g>
-
-                                {/* Göbek Detayı */}
-                                <circle cx="70" cy="128" r="6" fill="#FFB6D9" opacity="0.5" />
-
-                                {/* Düğmeler */}
-                                <circle cx="70" cy="113" r="3.5" fill="#FFF" />
-                                <circle cx="70" cy="125" r="3.5" fill="#FFF" />
-                                <circle cx="70" cy="137" r="3.5" fill="#FFF" />
-                            </svg>
+                            <CharacterBody character={selectedCharacter} size="normal" showAnimations={true} />
 
                             {/* Yüz - SVG'nin üzerine */}
                             <div style={{
@@ -1928,6 +2195,7 @@
                 <>
                     {currentScreen === 'profile' && <ProfileSelectionScreen />}
                     {currentScreen === 'character-create' && <CharacterCreateScreen />}
+                    {currentScreen === 'character-select' && <CharacterSelectScreen />}
                     {currentScreen === 'home' && <HomeScreen />}
                     {currentScreen === 'units' && <UnitsScreen />}
                     {currentScreen === 'lesson' && <LessonScreen />}
