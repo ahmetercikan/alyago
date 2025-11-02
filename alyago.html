@@ -807,40 +807,21 @@
 
                         if (videoRef.current) {
                             videoRef.current.srcObject = mediaStream;
+                            videoRef.current.playsInline = true;
+                            videoRef.current.muted = true;
 
-                            // Video yüklendiğinde ready durumuna geç
-                            const handleCanPlay = async () => {
-                                try {
-                                    await videoRef.current.play();
-                                    // Biraz bekle ve ready yap
-                                    setTimeout(() => {
-                                        setVideoReady(true);
-                                    }, 800);
-                                } catch (playError) {
-                                    console.error('Video play hatası:', playError);
-                                    // Yine de ready yap, bazı tarayıcılarda autoplay çalışır
-                                    setTimeout(() => {
-                                        setVideoReady(true);
-                                    }, 1000);
-                                }
-                            };
-
-                            // Birden fazla event dinle (tarayıcı uyumluluğu için)
-                            videoRef.current.onloadedmetadata = handleCanPlay;
-                            videoRef.current.oncanplay = handleCanPlay;
-
-                            // Güvenlik için timeout: 3 saniye içinde ready olmazsa yine de aç
-                            setTimeout(() => {
-                                if (!videoReady) {
-                                    console.log('Timeout: Kamera zorla açılıyor');
+                            // Video başladığında otomatik hazır yap
+                            videoRef.current.onloadedmetadata = () => {
+                                videoRef.current.play();
+                                // Kısa bir gecikme sonrası otomatik hazır yap
+                                setTimeout(() => {
                                     setVideoReady(true);
-                                }
-                            }, 3000);
+                                }, 500);
+                            };
                         }
                     } catch (error) {
-                        setVideoReady(false);
                         setStream(null);
-                        alert('Kamera erişimi reddedildi veya bir hata oluştu. Lütfen tarayıcı ayarlarından kamera iznini verin ve sayfayı yenileyin.');
+                        alert('Kamera erişimi reddedildi. Lütfen tarayıcı ayarlarından kamera iznini verin.');
                         console.error('Kamera hatası:', error);
                     }
                 };
@@ -960,14 +941,10 @@
                                             </div>
                                             <div className="text-center">
                                                 <p className="text-lg font-semibold text-purple-600 mb-4">
-                                                    {videoReady ? 'Yüzünü çemberin içine getir! 😊' : 'Kamera hazırlanıyor... ⏳'}
+                                                    {videoReady ? 'Harika! Şimdi fotoğrafını çekebilirsin! 😊' : 'Kamera hazırlanıyor... ⏳'}
                                                 </p>
-                                                {!videoReady && (
-                                                    <div className="mb-4">
-                                                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-purple-500 border-t-transparent"></div>
-                                                    </div>
-                                                )}
                                             </div>
+
                                             <button
                                                 onClick={capturePhoto}
                                                 disabled={!videoReady}
@@ -977,8 +954,9 @@
                                                         : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                                 }`}
                                             >
-                                                {videoReady ? '✨ Fotoğrafı Çek!' : '⏳ Lütfen Bekleyin...'}
+                                                ✨ Fotoğrafı Çek!
                                             </button>
+
                                             <button
                                                 onClick={skipCharacter}
                                                 className="w-full bg-gray-300 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-400 transition"
