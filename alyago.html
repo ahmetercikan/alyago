@@ -795,7 +795,6 @@
 
                 const startCamera = async () => {
                     try {
-                        setVideoReady(false);
                         const mediaStream = await navigator.mediaDevices.getUserMedia({
                             video: {
                                 facingMode: 'user',
@@ -809,16 +808,11 @@
                             videoRef.current.srcObject = mediaStream;
                             videoRef.current.playsInline = true;
                             videoRef.current.muted = true;
-
-                            // Video başladığında otomatik hazır yap
-                            videoRef.current.onloadedmetadata = () => {
-                                videoRef.current.play();
-                                // Kısa bir gecikme sonrası otomatik hazır yap
-                                setTimeout(() => {
-                                    setVideoReady(true);
-                                }, 500);
-                            };
+                            await videoRef.current.play();
                         }
+
+                        // Kamera açıldı, direkt hazır
+                        setVideoReady(true);
                     } catch (error) {
                         setStream(null);
                         alert('Kamera erişimi reddedildi. Lütfen tarayıcı ayarlarından kamera iznini verin.');
@@ -827,36 +821,26 @@
                 };
 
                 const capturePhoto = () => {
-                    if (!videoReady) {
-                        alert('Lütfen kameranın hazır olmasını bekleyin...');
-                        return;
-                    }
-
                     if (videoRef.current && canvasRef.current) {
                         const canvas = canvasRef.current;
                         const video = videoRef.current;
                         const context = canvas.getContext('2d');
 
-                        // Video'nun gerçekten görüntü içerip içermediğini kontrol et
-                        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                            canvas.width = 250;
-                            canvas.height = 320;
+                        canvas.width = 250;
+                        canvas.height = 320;
 
-                            // Videoyu canvas'a çiz
-                            context.drawImage(video, 0, 0, 250, 320);
+                        // Videoyu canvas'a çiz
+                        context.drawImage(video, 0, 0, 250, 320);
 
-                            // Data URL olarak al
-                            const photoData = canvas.toDataURL('image/png');
-                            setCapturedPhoto(photoData);
+                        // Data URL olarak al
+                        const photoData = canvas.toDataURL('image/png');
+                        setCapturedPhoto(photoData);
 
-                            // Kamerayı kapat
-                            if (stream) {
-                                stream.getTracks().forEach(track => track.stop());
-                            }
-                            setVideoReady(false);
-                        } else {
-                            alert('Kamera henüz hazır değil. Lütfen birkaç saniye bekleyin.');
+                        // Kamerayı kapat
+                        if (stream) {
+                            stream.getTracks().forEach(track => track.stop());
                         }
+                        setVideoReady(false);
                     }
                 };
 
@@ -941,18 +925,13 @@
                                             </div>
                                             <div className="text-center">
                                                 <p className="text-lg font-semibold text-purple-600 mb-4">
-                                                    {videoReady ? 'Harika! Şimdi fotoğrafını çekebilirsin! 😊' : 'Kamera hazırlanıyor... ⏳'}
+                                                    📸 Hazır ol! Fotoğrafını çekiyoruz! 😊
                                                 </p>
                                             </div>
 
                                             <button
                                                 onClick={capturePhoto}
-                                                disabled={!videoReady}
-                                                className={`w-full py-4 rounded-xl font-bold text-xl transition transform ${
-                                                    videoReady
-                                                        ? 'bg-gradient-to-r from-green-500 to-blue-500 text-white hover:from-green-600 hover:to-blue-600 hover:scale-105 cursor-pointer'
-                                                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                                }`}
+                                                className="w-full py-4 rounded-xl font-bold text-xl transition transform bg-gradient-to-r from-green-500 to-blue-500 text-white hover:from-green-600 hover:to-blue-600 hover:scale-105 cursor-pointer"
                                             >
                                                 ✨ Fotoğrafı Çek!
                                             </button>
