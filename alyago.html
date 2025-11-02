@@ -161,6 +161,16 @@
             width: 250px;
             height: 320px;
             margin: 0 auto;
+            overflow: hidden;
+            border-radius: 50%;
+            background: #e0e0e0;
+        }
+
+        .camera-frame video {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover !important;
+            display: block !important;
         }
 
         .camera-overlay {
@@ -795,6 +805,8 @@
 
                 const startCamera = async () => {
                     try {
+                        setVideoReady(false);
+
                         const mediaStream = await navigator.mediaDevices.getUserMedia({
                             video: {
                                 facingMode: 'user',
@@ -802,19 +814,19 @@
                                 height: { ideal: 640 }
                             }
                         });
+
+                        console.log('Kamera stream alındı');
                         setStream(mediaStream);
 
-                        if (videoRef.current) {
-                            videoRef.current.srcObject = mediaStream;
-                            videoRef.current.playsInline = true;
-                            videoRef.current.muted = true;
-                            await videoRef.current.play();
-                        }
+                        // useEffect'in stream'i bağlaması ve video'nun stabilize olması için bekle
+                        await new Promise(resolve => setTimeout(resolve, 1200));
 
-                        // Kamera açıldı, direkt hazır
+                        // Kamera hazır
                         setVideoReady(true);
+                        console.log('Kamera hazır');
                     } catch (error) {
                         setStream(null);
+                        setVideoReady(false);
                         alert('Kamera erişimi reddedildi. Lütfen tarayıcı ayarlarından kamera iznini verin.');
                         console.error('Kamera hatası:', error);
                     }
@@ -864,6 +876,18 @@
                     setCurrentScreen('home');
                 };
 
+                // Stream değiştiğinde video element'e bağla
+                React.useEffect(() => {
+                    if (stream && videoRef.current) {
+                        console.log('Stream video element\'e bağlanıyor...');
+                        videoRef.current.srcObject = stream;
+                        videoRef.current.play().catch(err => {
+                            console.error('Video play hatası:', err);
+                        });
+                    }
+                }, [stream]);
+
+                // Cleanup: component unmount olduğunda stream'i kapat
                 React.useEffect(() => {
                     return () => {
                         if (stream) {
@@ -919,19 +943,24 @@
                                                     ref={videoRef}
                                                     autoPlay
                                                     playsInline
-                                                    className="w-full h-full rounded-full object-cover"
+                                                    muted
                                                 />
                                                 <div className="camera-overlay"></div>
                                             </div>
                                             <div className="text-center">
                                                 <p className="text-lg font-semibold text-purple-600 mb-4">
-                                                    📸 Hazır ol! Fotoğrafını çekiyoruz! 😊
+                                                    {videoReady ? '📸 Hazır ol! Fotoğrafını çekiyoruz! 😊' : '⏳ Kamera yükleniyor...'}
                                                 </p>
                                             </div>
 
                                             <button
                                                 onClick={capturePhoto}
-                                                className="w-full py-4 rounded-xl font-bold text-xl transition transform bg-gradient-to-r from-green-500 to-blue-500 text-white hover:from-green-600 hover:to-blue-600 hover:scale-105 cursor-pointer"
+                                                disabled={!videoReady}
+                                                className={`w-full py-4 rounded-xl font-bold text-xl transition transform ${
+                                                    videoReady
+                                                        ? 'bg-gradient-to-r from-green-500 to-blue-500 text-white hover:from-green-600 hover:to-blue-600 hover:scale-105 cursor-pointer'
+                                                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                }`}
                                             >
                                                 ✨ Fotoğrafı Çek!
                                             </button>
