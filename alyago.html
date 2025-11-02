@@ -1,0 +1,1499 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AlyaGo - İngilizce Öğrenme Platformu</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+        
+        * {
+            font-family: 'Poppins', sans-serif;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .card-hover {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+        
+        .progress-bar {
+            transition: width 0.5s ease;
+        }
+        
+        .shake {
+            animation: shake 0.5s;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+        
+        .pulse-success {
+            animation: pulse-success 0.5s;
+        }
+        
+        @keyframes pulse-success {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Web Speech API - Sesli okuma fonksiyonu
+        const speak = (text, lang = 'en-US') => {
+            if ('speechSynthesis' in window) {
+                // Mevcut konuşmayı durdur
+                window.speechSynthesis.cancel();
+
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = lang;
+                utterance.rate = 0.9; // Biraz daha yavaş konuş
+                utterance.pitch = 1;
+                utterance.volume = 1;
+
+                window.speechSynthesis.speak(utterance);
+            } else {
+                alert('Tarayıcınız sesli okuma özelliğini desteklemiyor.');
+            }
+        };
+
+        // Konuşma tanıma fonksiyonu
+        const startSpeechRecognition = (expectedText, onResult) => {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert('Tarayıcınız konuşma tanıma özelliğini desteklemiyor. Chrome veya Edge kullanmayı deneyin.');
+                return null;
+            }
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+
+            recognition.lang = 'en-US';
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 3; // Daha fazla alternatif dene
+
+            // Daha uzun dinleme süresi
+            if (recognition.maxResults) {
+                recognition.maxResults = 5;
+            }
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript.toLowerCase().trim();
+                const expected = expectedText.toLowerCase().trim();
+
+                // Basit benzerlik kontrolü
+                const similarity = calculateSimilarity(transcript, expected);
+                onResult(transcript, similarity);
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Konuşma tanıma hatası:', event.error);
+
+                let errorMessage = 'Mikrofon hatası. ';
+
+                switch(event.error) {
+                    case 'not-allowed':
+                    case 'permission-denied':
+                        errorMessage = 'Mikrofon izni verilmedi. Lütfen tarayıcı ayarlarından mikrofon iznini verin.';
+                        break;
+                    case 'no-speech':
+                        errorMessage = 'Ses algılanamadı. Lütfen daha yüksek sesle konuşun.';
+                        break;
+                    case 'network':
+                        errorMessage = 'İnternet bağlantı hatası. Lütfen internet bağlantınızı kontrol edin.';
+                        break;
+                    case 'audio-capture':
+                        errorMessage = 'Mikrofon bulunamadı. Lütfen mikrofonunuzun bağlı olduğundan emin olun.';
+                        break;
+                    case 'aborted':
+                        errorMessage = 'Ses tanıma iptal edildi.';
+                        break;
+                    default:
+                        errorMessage = `Hata oluştu: ${event.error}`;
+                }
+
+                onResult(null, 0, errorMessage);
+            };
+
+            recognition.onstart = () => {
+                console.log('Mikrofon dinlemeye başladı');
+            };
+
+            recognition.onend = () => {
+                console.log('Mikrofon dinleme sona erdi');
+            };
+
+            try {
+                recognition.start();
+            } catch (error) {
+                console.error('Recognition başlatma hatası:', error);
+                onResult(null, 0, 'Mikrofon başlatılamadı. Lütfen sayfayı yenileyin.');
+            }
+
+            return recognition;
+        };
+
+        // Metin benzerliği hesaplama (basit Levenshtein)
+        const calculateSimilarity = (str1, str2) => {
+            const longer = str1.length > str2.length ? str1 : str2;
+            const shorter = str1.length > str2.length ? str2 : str1;
+
+            if (longer.length === 0) return 100;
+
+            const editDistance = levenshteinDistance(longer, shorter);
+            return ((longer.length - editDistance) / longer.length) * 100;
+        };
+
+        const levenshteinDistance = (str1, str2) => {
+            const matrix = [];
+
+            for (let i = 0; i <= str2.length; i++) {
+                matrix[i] = [i];
+            }
+
+            for (let j = 0; j <= str1.length; j++) {
+                matrix[0][j] = j;
+            }
+
+            for (let i = 1; i <= str2.length; i++) {
+                for (let j = 1; j <= str1.length; j++) {
+                    if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+                        matrix[i][j] = matrix[i - 1][j - 1];
+                    } else {
+                        matrix[i][j] = Math.min(
+                            matrix[i - 1][j - 1] + 1,
+                            matrix[i][j - 1] + 1,
+                            matrix[i - 1][j] + 1
+                        );
+                    }
+                }
+            }
+
+            return matrix[str2.length][str1.length];
+        };
+
+        // Kapsamlı ders içeriği ve kelime veritabanı
+        const lessonsDatabase = {
+            A1: {
+                level: "Başlangıç (A1)",
+                units: [
+                    {
+                        id: 1,
+                        name: "Kendini Tanıtma",
+                        icon: "👋",
+                        lessons: [
+                            {
+                                id: 1,
+                                title: "Merhaba Demek",
+                                type: "vocabulary",
+                                words: [
+                                    { en: "Hello", tr: "Merhaba", image: "👋", pronunciation: "heh-LOH" },
+                                    { en: "Hi", tr: "Selam", image: "😊", pronunciation: "hai" },
+                                    { en: "Good morning", tr: "Günaydın", image: "🌅", pronunciation: "gud MOR-ning" },
+                                    { en: "Good evening", tr: "İyi akşamlar", image: "🌆", pronunciation: "gud EEV-ning" },
+                                    { en: "Goodbye", tr: "Hoşçakal", image: "👋", pronunciation: "gud-BAI" },
+                                    { en: "See you", tr: "Görüşürüz", image: "😊", pronunciation: "see yu" }
+                                ]
+                            },
+                            {
+                                id: 2,
+                                title: "Kendini Tanıtma",
+                                type: "phrases",
+                                sentences: [
+                                    { en: "My name is...", tr: "Benim adım...", example: "My name is Ahmet." },
+                                    { en: "I am from Turkey", tr: "Ben Türkiye'denim", example: "I am from Turkey." },
+                                    { en: "I am ... years old", tr: "Ben ... yaşındayım", example: "I am 25 years old." },
+                                    { en: "Nice to meet you", tr: "Tanıştığımıza memnun oldum", example: "Nice to meet you!" },
+                                    { en: "How are you?", tr: "Nasılsın?", example: "Hello! How are you?" },
+                                    { en: "I am fine, thank you", tr: "İyiyim, teşekkürler", example: "I am fine, thank you." }
+                                ]
+                            },
+                            {
+                                id: 3,
+                                title: "Sayılar 1-20",
+                                type: "vocabulary",
+                                words: [
+                                    { en: "one", tr: "bir", image: "1️⃣", pronunciation: "wuhn" },
+                                    { en: "two", tr: "iki", image: "2️⃣", pronunciation: "too" },
+                                    { en: "three", tr: "üç", image: "3️⃣", pronunciation: "three" },
+                                    { en: "four", tr: "dört", image: "4️⃣", pronunciation: "for" },
+                                    { en: "five", tr: "beş", image: "5️⃣", pronunciation: "faiv" },
+                                    { en: "ten", tr: "on", image: "🔟", pronunciation: "ten" },
+                                    { en: "twenty", tr: "yirmi", image: "2️⃣0️⃣", pronunciation: "TWEN-tee" }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        id: 2,
+                        name: "Günlük Hayat",
+                        icon: "🏠",
+                        lessons: [
+                            {
+                                id: 4,
+                                title: "Aile Üyeleri",
+                                type: "vocabulary",
+                                words: [
+                                    { en: "mother", tr: "anne", image: "👩", pronunciation: "MUH-ther" },
+                                    { en: "father", tr: "baba", image: "👨", pronunciation: "FAH-ther" },
+                                    { en: "sister", tr: "kız kardeş", image: "👧", pronunciation: "SIS-ter" },
+                                    { en: "brother", tr: "erkek kardeş", image: "👦", pronunciation: "BRUH-ther" },
+                                    { en: "family", tr: "aile", image: "👨‍👩‍👧‍👦", pronunciation: "FAM-i-lee" },
+                                    { en: "grandmother", tr: "büyükanne", image: "👵", pronunciation: "GRAND-muh-ther" }
+                                ]
+                            },
+                            {
+                                id: 5,
+                                title: "Renkler",
+                                type: "vocabulary",
+                                words: [
+                                    { en: "red", tr: "kırmızı", image: "🔴", pronunciation: "red" },
+                                    { en: "blue", tr: "mavi", image: "🔵", pronunciation: "bloo" },
+                                    { en: "green", tr: "yeşil", image: "🟢", pronunciation: "green" },
+                                    { en: "yellow", tr: "sarı", image: "🟡", pronunciation: "YEL-oh" },
+                                    { en: "black", tr: "siyah", image: "⚫", pronunciation: "blak" },
+                                    { en: "white", tr: "beyaz", image: "⚪", pronunciation: "wite" }
+                                ]
+                            },
+                            {
+                                id: 6,
+                                title: "Yiyecekler",
+                                type: "vocabulary",
+                                words: [
+                                    { en: "apple", tr: "elma", image: "🍎", pronunciation: "AP-uhl" },
+                                    { en: "bread", tr: "ekmek", image: "🍞", pronunciation: "bred" },
+                                    { en: "water", tr: "su", image: "💧", pronunciation: "WAW-ter" },
+                                    { en: "milk", tr: "süt", image: "🥛", pronunciation: "milk" },
+                                    { en: "egg", tr: "yumurta", image: "🥚", pronunciation: "eg" },
+                                    { en: "cheese", tr: "peynir", image: "🧀", pronunciation: "cheez" }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        id: 3,
+                        name: "Zaman ve Yer",
+                        icon: "⏰",
+                        lessons: [
+                            {
+                                id: 7,
+                                title: "Haftanın Günleri",
+                                type: "vocabulary",
+                                words: [
+                                    { en: "Monday", tr: "Pazartesi", image: "📅", pronunciation: "MUN-day" },
+                                    { en: "Tuesday", tr: "Salı", image: "📅", pronunciation: "TOOZ-day" },
+                                    { en: "Wednesday", tr: "Çarşamba", image: "📅", pronunciation: "WENZ-day" },
+                                    { en: "Thursday", tr: "Perşembe", image: "📅", pronunciation: "THURZ-day" },
+                                    { en: "Friday", tr: "Cuma", image: "📅", pronunciation: "FRY-day" },
+                                    { en: "Saturday", tr: "Cumartesi", image: "📅", pronunciation: "SAT-er-day" },
+                                    { en: "Sunday", tr: "Pazar", image: "📅", pronunciation: "SUN-day" }
+                                ]
+                            },
+                            {
+                                id: 8,
+                                title: "Yer Bildiren İfadeler",
+                                type: "phrases",
+                                sentences: [
+                                    { en: "Where is...?", tr: "... nerede?", example: "Where is the bathroom?" },
+                                    { en: "Here", tr: "Burada", example: "I am here." },
+                                    { en: "There", tr: "Orada", example: "The book is there." },
+                                    { en: "In the house", tr: "Evde", example: "I am in the house." },
+                                    { en: "At school", tr: "Okulda", example: "She is at school." },
+                                    { en: "On the table", tr: "Masada", example: "The phone is on the table." }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            A2: {
+                level: "Temel (A2)",
+                units: [
+                    {
+                        id: 4,
+                        name: "Alışveriş ve Para",
+                        icon: "🛒",
+                        lessons: [
+                            {
+                                id: 9,
+                                title: "Alışveriş Cümleleri",
+                                type: "phrases",
+                                sentences: [
+                                    { en: "How much is this?", tr: "Bu ne kadar?", example: "How much is this shirt?" },
+                                    { en: "I want to buy...", tr: "... almak istiyorum", example: "I want to buy a book." },
+                                    { en: "Do you have...?", tr: "... var mı?", example: "Do you have a red shirt?" },
+                                    { en: "It's expensive", tr: "Bu pahalı", example: "This watch is expensive." },
+                                    { en: "It's cheap", tr: "Bu ucuz", example: "These shoes are cheap." }
+                                ]
+                            },
+                            {
+                                id: 10,
+                                title: "Mağaza Kelimeleri",
+                                type: "vocabulary",
+                                words: [
+                                    { en: "shop", tr: "dükkan", image: "🏪", pronunciation: "shop" },
+                                    { en: "supermarket", tr: "süpermarket", image: "🏬", pronunciation: "SOO-per-mar-ket" },
+                                    { en: "money", tr: "para", image: "💰", pronunciation: "MUH-nee" },
+                                    { en: "price", tr: "fiyat", image: "💵", pronunciation: "price" },
+                                    { en: "expensive", tr: "pahalı", image: "💸", pronunciation: "ik-SPEN-siv" },
+                                    { en: "cheap", tr: "ucuz", image: "🏷️", pronunciation: "cheep" }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        id: 5,
+                        name: "Hobiler ve Aktiviteler",
+                        icon: "⚽",
+                        lessons: [
+                            {
+                                id: 11,
+                                title: "Spor ve Hobiler",
+                                type: "vocabulary",
+                                words: [
+                                    { en: "football", tr: "futbol", image: "⚽", pronunciation: "FUT-bawl" },
+                                    { en: "music", tr: "müzik", image: "🎵", pronunciation: "MYOO-zik" },
+                                    { en: "reading", tr: "okuma", image: "📚", pronunciation: "REE-ding" },
+                                    { en: "swimming", tr: "yüzme", image: "🏊", pronunciation: "SWIM-ing" },
+                                    { en: "cooking", tr: "yemek pişirme", image: "🍳", pronunciation: "KUK-ing" },
+                                    { en: "dancing", tr: "dans", image: "💃", pronunciation: "DAN-sing" }
+                                ]
+                            },
+                            {
+                                id: 12,
+                                title: "Hobi Cümleleri",
+                                type: "phrases",
+                                sentences: [
+                                    { en: "I like...", tr: "... seviyorum", example: "I like music." },
+                                    { en: "I don't like...", tr: "... sevmiyorum", example: "I don't like football." },
+                                    { en: "My hobby is...", tr: "Hobim...", example: "My hobby is reading." },
+                                    { en: "I play...", tr: "... oynuyorum", example: "I play basketball." },
+                                    { en: "I enjoy...", tr: "... yapmaktan hoşlanıyorum", example: "I enjoy swimming." }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        };
+
+        // Ana Uygulama Bileşeni
+        function AlyaGoApp() {
+            const [userProfile, setUserProfile] = useState(null); // 'child' veya 'adult'
+            const [currentScreen, setCurrentScreen] = useState('profile');
+            const [currentLevel, setCurrentLevel] = useState('A1');
+            const [currentUnit, setCurrentUnit] = useState(null);
+            const [currentLesson, setCurrentLesson] = useState(null);
+            const [userProgress, setUserProgress] = useState({
+                totalXP: 0,
+                streak: 0,
+                completedLessons: [],
+                level: 'A1'
+            });
+            const [exerciseState, setExerciseState] = useState({
+                currentQuestion: 0,
+                score: 0,
+                answers: [],
+                showResult: false
+            });
+            const [listeningTest, setListeningTest] = useState({
+                questions: [],
+                currentQ: 0,
+                score: 0,
+                showResults: false
+            });
+
+            // Profil Seçim Ekranı
+            const ProfileSelectionScreen = () => (
+                <div className="min-h-screen gradient-bg flex items-center justify-center p-4">
+                    <div className="max-w-6xl w-full">
+                        <div className="text-center text-white mb-12 fade-in">
+                            <h1 className="text-7xl font-bold mb-4">AlyaGo</h1>
+                            <p className="text-3xl font-light">İngilizce Öğrenme Macerası</p>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                            {/* Çocuk Profili */}
+                            <div
+                                onClick={() => {
+                                    setUserProfile('child');
+                                    setCurrentScreen('home');
+                                }}
+                                className="bg-white rounded-3xl p-12 shadow-2xl card-hover cursor-pointer transform transition hover:scale-105"
+                            >
+                                <div className="text-center">
+                                    <div className="text-8xl mb-6">👶🎈</div>
+                                    <h2 className="text-4xl font-bold text-purple-600 mb-4">Çocuk</h2>
+                                    <p className="text-xl text-gray-600 mb-6">
+                                        Eğlenceli oyunlar ve sesli anlatımlarla İngilizce öğren!
+                                    </p>
+                                    <ul className="text-left space-y-3 text-gray-700">
+                                        <li className="flex items-center">
+                                            <span className="text-2xl mr-3">🎮</span>
+                                            <span>Renkli ve eğlenceli oyunlar</span>
+                                        </li>
+                                        <li className="flex items-center">
+                                            <span className="text-2xl mr-3">🔊</span>
+                                            <span>Sesli Türkçe anlatım</span>
+                                        </li>
+                                        <li className="flex items-center">
+                                            <span className="text-2xl mr-3">🌟</span>
+                                            <span>Yıldız toplama sistemi</span>
+                                        </li>
+                                        <li className="flex items-center">
+                                            <span className="text-2xl mr-3">🎨</span>
+                                            <span>Görsel odaklı öğrenme</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            {/* Yetişkin Profili */}
+                            <div
+                                onClick={() => {
+                                    setUserProfile('adult');
+                                    setCurrentScreen('home');
+                                }}
+                                className="bg-white rounded-3xl p-12 shadow-2xl card-hover cursor-pointer transform transition hover:scale-105"
+                            >
+                                <div className="text-center">
+                                    <div className="text-8xl mb-6">👔📚</div>
+                                    <h2 className="text-4xl font-bold text-indigo-600 mb-4">Yetişkin</h2>
+                                    <p className="text-xl text-gray-600 mb-6">
+                                        Sistematik ve detaylı İngilizce eğitimi
+                                    </p>
+                                    <ul className="text-left space-y-3 text-gray-700">
+                                        <li className="flex items-center">
+                                            <span className="text-2xl mr-3">📖</span>
+                                            <span>Detaylı dilbilgisi dersleri</span>
+                                        </li>
+                                        <li className="flex items-center">
+                                            <span className="text-2xl mr-3">🎤</span>
+                                            <span>Telaffuz pratiği</span>
+                                        </li>
+                                        <li className="flex items-center">
+                                            <span className="text-2xl mr-3">📊</span>
+                                            <span>İlerleme takibi</span>
+                                        </li>
+                                        <li className="flex items-center">
+                                            <span className="text-2xl mr-3">🎯</span>
+                                            <span>Seviye testleri</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            // Ana Ekran
+            const HomeScreen = () => {
+                const isChild = userProfile === 'child';
+
+                return (
+                <div className="min-h-screen gradient-bg">
+                    <div className="container mx-auto px-4 py-8">
+                        {/* Header */}
+                        <div className="text-center text-white mb-12 fade-in">
+                            <div className="flex justify-between items-center mb-4">
+                                <button
+                                    onClick={() => {
+                                        setUserProfile(null);
+                                        setCurrentScreen('profile');
+                                    }}
+                                    className="px-4 py-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 transition"
+                                >
+                                    ← Profil Değiştir
+                                </button>
+                                <div className="text-2xl">{isChild ? '👶' : '👔'}</div>
+                            </div>
+                            <h1 className="text-6xl font-bold mb-4">
+                                {isChild ? '🎈 AlyaGo 🎮' : 'AlyaGo'}
+                            </h1>
+                            <p className="text-2xl font-light">
+                                {isChild ? 'İngilizce Öğrenme Oyunu!' : 'Daha İyi İngilizce Öğrenin'}
+                            </p>
+                            <div className="mt-6 flex justify-center space-x-8">
+                                <div className="bg-white bg-opacity-20 rounded-lg p-4 backdrop-blur-sm">
+                                    <div className="text-3xl font-bold">{userProgress.totalXP}</div>
+                                    <div className="text-sm">XP Puanı</div>
+                                </div>
+                                <div className="bg-white bg-opacity-20 rounded-lg p-4 backdrop-blur-sm">
+                                    <div className="text-3xl font-bold">{userProgress.streak} 🔥</div>
+                                    <div className="text-sm">Gün Serisi</div>
+                                </div>
+                                <div className="bg-white bg-opacity-20 rounded-lg p-4 backdrop-blur-sm">
+                                    <div className="text-3xl font-bold">{userProgress.completedLessons.length}</div>
+                                    <div className="text-sm">Ders Tamamlandı</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Sesli Test Butonu */}
+                        <div className="bg-white rounded-3xl shadow-2xl p-6 max-w-6xl mx-auto mb-6">
+                            <button
+                                onClick={() => setCurrentScreen('listening')}
+                                className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-2xl p-8 card-hover cursor-pointer text-center"
+                            >
+                                <div className="text-6xl mb-4">👂🎧</div>
+                                <h3 className="text-3xl font-bold mb-2">Dinleme Testi</h3>
+                                <p className="text-lg opacity-90">Sesli kelimeleri dinle, doğru cevabı bul!</p>
+                            </button>
+                        </div>
+
+                        {/* Seviye Seçimi */}
+                        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-6xl mx-auto">
+                            <h2 className="text-3xl font-bold text-gray-800 mb-8 text-center">Seviyeni Seç</h2>
+                            <div className="grid md:grid-cols-2 gap-6">
+                                {Object.keys(lessonsDatabase).map(level => (
+                                    <div
+                                        key={level}
+                                        onClick={() => {
+                                            setCurrentLevel(level);
+                                            setCurrentScreen('units');
+                                        }}
+                                        className="card-hover bg-gradient-to-br from-purple-400 to-indigo-500 rounded-2xl p-8 cursor-pointer text-white"
+                                    >
+                                        <div className="text-5xl mb-4">
+                                            {level === 'A1' ? '🌱' : '🌿'}
+                                        </div>
+                                        <h3 className="text-2xl font-bold mb-2">{level}</h3>
+                                        <p className="text-lg opacity-90">{lessonsDatabase[level].level}</p>
+                                        <div className="mt-4 bg-white bg-opacity-20 rounded-full h-2">
+                                            <div
+                                                className="bg-white h-full rounded-full progress-bar"
+                                                style={{width: `${(userProgress.completedLessons.filter(l => l.startsWith(level)).length /
+                                                    lessonsDatabase[level].units.reduce((sum, u) => sum + u.lessons.length, 0)) * 100}%`}}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Özellikler */}
+                            <div className="mt-12 grid md:grid-cols-4 gap-6">
+                                <div className="text-center p-6 bg-blue-50 rounded-xl">
+                                    <div className="text-4xl mb-3">🔊</div>
+                                    <h4 className="font-bold text-lg mb-2">Sesli Telaffuz</h4>
+                                    <p className="text-gray-600">Her kelimeyi gerçek İngilizce aksanla dinle</p>
+                                </div>
+                                <div className="text-center p-6 bg-green-50 rounded-xl">
+                                    <div className="text-4xl mb-3">🎤</div>
+                                    <h4 className="font-bold text-lg mb-2">Konuşma Pratiği</h4>
+                                    <p className="text-gray-600">Telaffuzunu test et, geri bildirim al</p>
+                                </div>
+                                <div className="text-center p-6 bg-purple-50 rounded-xl">
+                                    <div className="text-4xl mb-3">👂</div>
+                                    <h4 className="font-bold text-lg mb-2">Dinleme Testleri</h4>
+                                    <p className="text-gray-600">Duyduğun kelimeleri tanı, puan kazan</p>
+                                </div>
+                                <div className="text-center p-6 bg-yellow-50 rounded-xl">
+                                    <div className="text-4xl mb-3">🏆</div>
+                                    <h4 className="font-bold text-lg mb-2">XP Sistemi</h4>
+                                    <p className="text-gray-600">Pratik yap, puan kazan, seviye atla</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                );
+            };
+
+            // Ünite Listesi Ekranı
+            const UnitsScreen = () => {
+                const levelData = lessonsDatabase[currentLevel];
+                
+                return (
+                    <div className="min-h-screen bg-gray-50">
+                        <div className="gradient-bg text-white p-6">
+                            <button 
+                                onClick={() => setCurrentScreen('home')}
+                                className="mb-4 px-4 py-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 transition"
+                            >
+                                ← Geri
+                            </button>
+                            <h1 className="text-4xl font-bold">{levelData.level}</h1>
+                        </div>
+
+                        <div className="container mx-auto px-4 py-8">
+                            <div className="max-w-4xl mx-auto space-y-6">
+                                {levelData.units.map(unit => (
+                                    <div key={unit.id} className="bg-white rounded-2xl shadow-lg p-6 fade-in">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div className="flex items-center">
+                                                <div className="text-5xl mr-4">{unit.icon}</div>
+                                                <div>
+                                                    <h3 className="text-2xl font-bold text-gray-800">{unit.name}</h3>
+                                                    <p className="text-gray-600">{unit.lessons.length} ders</p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-sm text-gray-500">İlerleme</div>
+                                                <div className="font-bold text-lg text-purple-600">
+                                                    {unit.lessons.filter(l => 
+                                                        userProgress.completedLessons.includes(`${currentLevel}-${unit.id}-${l.id}`)
+                                                    ).length} / {unit.lessons.length}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            {unit.lessons.map(lesson => {
+                                                const isCompleted = userProgress.completedLessons.includes(
+                                                    `${currentLevel}-${unit.id}-${lesson.id}`
+                                                );
+                                                
+                                                return (
+                                                    <div
+                                                        key={lesson.id}
+                                                        onClick={() => {
+                                                            setCurrentUnit(unit);
+                                                            setCurrentLesson(lesson);
+                                                            setCurrentScreen('lesson');
+                                                        }}
+                                                        className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-purple-50 cursor-pointer transition card-hover"
+                                                    >
+                                                        <div className="flex items-center">
+                                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-4 ${
+                                                                isCompleted ? 'bg-green-500' : 'bg-purple-500'
+                                                            } text-white font-bold`}>
+                                                                {isCompleted ? '✓' : lesson.id}
+                                                            </div>
+                                                            <div>
+                                                                <div className="font-semibold text-gray-800">{lesson.title}</div>
+                                                                <div className="text-sm text-gray-500">
+                                                                    {lesson.type === 'vocabulary' ? '📚 Kelime' : 
+                                                                     lesson.type === 'phrases' ? '💬 Cümleler' : '✍️ Alıştırma'}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-purple-600 font-bold">→</div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            // Ders Ekranı
+            const LessonScreen = () => {
+                const [currentStep, setCurrentStep] = useState(0);
+                const [showAnswer, setShowAnswer] = useState(false);
+                const [userAnswer, setUserAnswer] = useState('');
+                const [feedback, setFeedback] = useState(null);
+                const [isRecording, setIsRecording] = useState(false);
+                const [speechResult, setSpeechResult] = useState(null);
+
+                const content = currentLesson.type === 'vocabulary' ? currentLesson.words : currentLesson.sentences;
+                const totalSteps = content.length;
+
+                const handleNext = () => {
+                    if (currentStep < totalSteps - 1) {
+                        setCurrentStep(currentStep + 1);
+                        setShowAnswer(false);
+                        setUserAnswer('');
+                        setFeedback(null);
+                        setSpeechResult(null);
+                    } else {
+                        // Dersi bitir
+                        const lessonId = `${currentLevel}-${currentUnit.id}-${currentLesson.id}`;
+                        if (!userProgress.completedLessons.includes(lessonId)) {
+                            setUserProgress({
+                                ...userProgress,
+                                completedLessons: [...userProgress.completedLessons, lessonId],
+                                totalXP: userProgress.totalXP + 50
+                            });
+                        }
+                        setCurrentScreen('exercise');
+                        initExercise();
+                    }
+                };
+
+                const handleSpeechPractice = () => {
+                    if (isRecording) return;
+
+                    setIsRecording(true);
+                    setSpeechResult(null);
+
+                    const expectedText = currentItem.en || currentItem.example;
+
+                    startSpeechRecognition(expectedText, (transcript, similarity, errorMsg) => {
+                        setIsRecording(false);
+
+                        if (errorMsg) {
+                            setSpeechResult({
+                                success: false,
+                                message: errorMsg,
+                                transcript: null
+                            });
+                            return;
+                        }
+
+                        if (!transcript) {
+                            setSpeechResult({
+                                success: false,
+                                message: 'Ses algılanamadı. Lütfen daha net konuşun.',
+                                transcript: null
+                            });
+                            return;
+                        }
+
+                        const success = similarity >= 70;
+
+                        if (success) {
+                            setUserProgress({
+                                ...userProgress,
+                                totalXP: userProgress.totalXP + 5
+                            });
+                        }
+
+                        setSpeechResult({
+                            success,
+                            similarity: Math.round(similarity),
+                            transcript,
+                            message: success
+                                ? `Harika! %${Math.round(similarity)} benzerlik! +5 XP`
+                                : `Tekrar dene. Doğru telaffuz: "${expectedText}"`
+                        });
+                    });
+                };
+
+                const initExercise = () => {
+                    setExerciseState({
+                        currentQuestion: 0,
+                        score: 0,
+                        answers: [],
+                        showResult: false
+                    });
+                };
+
+                const currentItem = content[currentStep];
+
+                return (
+                    <div className="min-h-screen bg-gray-50">
+                        <div className="gradient-bg text-white p-6">
+                            <button 
+                                onClick={() => setCurrentScreen('units')}
+                                className="mb-4 px-4 py-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 transition"
+                            >
+                                ← Geri
+                            </button>
+                            <h1 className="text-3xl font-bold">{currentLesson.title}</h1>
+                            <div className="mt-4 bg-white bg-opacity-20 rounded-full h-3">
+                                <div 
+                                    className="bg-white h-full rounded-full progress-bar"
+                                    style={{width: `${((currentStep + 1) / totalSteps) * 100}%`}}
+                                />
+                            </div>
+                            <p className="mt-2 text-sm">{currentStep + 1} / {totalSteps}</p>
+                        </div>
+
+                        <div className="container mx-auto px-4 py-12">
+                            <div className="max-w-2xl mx-auto">
+                                <div className="bg-white rounded-3xl shadow-2xl p-12 text-center fade-in">
+                                    {currentLesson.type === 'vocabulary' ? (
+                                        <>
+                                            <div className="text-9xl mb-8">{currentItem.image}</div>
+                                            <div className="flex items-center justify-center gap-4 mb-4">
+                                                <div className="text-5xl font-bold text-gray-800">{currentItem.en}</div>
+                                                <button
+                                                    onClick={() => speak(currentItem.en)}
+                                                    className="bg-blue-500 hover:bg-blue-600 text-white p-4 rounded-full transition transform hover:scale-110"
+                                                    title="Telaffuzu dinle"
+                                                >
+                                                    <span className="text-2xl">🔊</span>
+                                                </button>
+                                            </div>
+                                            {showAnswer && (
+                                                <div className="pulse-success">
+                                                    <div className="text-3xl text-purple-600 mb-2">{currentItem.tr}</div>
+                                                    <div className="text-xl text-gray-500 italic">/{currentItem.pronunciation}/</div>
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-center justify-center gap-4 mb-6">
+                                                <div className="text-4xl font-bold text-gray-800">{currentItem.en}</div>
+                                                <button
+                                                    onClick={() => speak(currentItem.en)}
+                                                    className="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full transition transform hover:scale-110"
+                                                    title="Telaffuzu dinle"
+                                                >
+                                                    <span className="text-xl">🔊</span>
+                                                </button>
+                                            </div>
+                                            {showAnswer && (
+                                                <div className="pulse-success">
+                                                    <div className="text-2xl text-purple-600 mb-4">{currentItem.tr}</div>
+                                                    <div className="bg-gray-100 rounded-xl p-4 text-left">
+                                                        <div className="text-sm text-gray-500 mb-2">Örnek:</div>
+                                                        <div className="text-xl text-gray-700">{currentItem.example}</div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+
+                                    <div className="mt-8 space-y-4">
+                                        {/* Konuşma Pratiği - Sadece Yetişkinler */}
+                                        {userProfile === 'adult' && (
+                                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-blue-200">
+                                            <div className="text-center mb-4">
+                                                <div className="text-lg font-bold text-gray-800 mb-2">🎤 Konuşma Pratiği</div>
+                                                <p className="text-sm text-gray-600 mb-2">
+                                                    {isRecording ? '🔴 Şimdi konuşun!' : 'Önce kelimeyi dinleyin, sonra kendiniz söyleyin'}
+                                                </p>
+                                                <div className="flex items-center justify-center gap-3 mb-3">
+                                                    <div className="bg-white rounded-lg p-3 shadow">
+                                                        <span className="text-2xl font-bold text-blue-600">{currentItem.en}</span>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => speak(currentItem.en)}
+                                                        className="bg-green-500 hover:bg-green-600 text-white p-3 rounded-full transition transform hover:scale-110 shadow-lg"
+                                                        title="Önce telaffuzu dinle"
+                                                    >
+                                                        <span className="text-xl">🔊</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={handleSpeechPractice}
+                                                disabled={isRecording}
+                                                className={`w-full py-5 rounded-xl font-bold text-xl transition transform shadow-lg ${
+                                                    isRecording
+                                                        ? 'bg-red-500 text-white animate-pulse scale-105'
+                                                        : 'bg-blue-500 hover:bg-blue-600 text-white hover:scale-105'
+                                                }`}
+                                            >
+                                                {isRecording ? '🔴 Dinleniyor... Konuşun!' : '🎤 Başlat & Konuş'}
+                                            </button>
+
+                                            {isRecording && (
+                                                <div className="mt-4 text-center">
+                                                    <div className="flex justify-center space-x-2">
+                                                        <div className="w-2 h-8 bg-red-500 rounded animate-pulse" style={{animationDelay: '0s'}}></div>
+                                                        <div className="w-2 h-10 bg-red-500 rounded animate-pulse" style={{animationDelay: '0.1s'}}></div>
+                                                        <div className="w-2 h-12 bg-red-500 rounded animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                                                        <div className="w-2 h-10 bg-red-500 rounded animate-pulse" style={{animationDelay: '0.3s'}}></div>
+                                                        <div className="w-2 h-8 bg-red-500 rounded animate-pulse" style={{animationDelay: '0.4s'}}></div>
+                                                    </div>
+                                                    <p className="text-sm text-red-600 font-semibold mt-2">Mikrofonunuz açık, konuşun!</p>
+                                                </div>
+                                            )}
+
+                                            {speechResult && (
+                                                <div className={`mt-4 p-4 rounded-lg ${
+                                                    speechResult.success ? 'bg-green-100 border-2 border-green-500' : 'bg-yellow-100 border-2 border-yellow-500'
+                                                }`}>
+                                                    <div className={`font-bold mb-2 ${
+                                                        speechResult.success ? 'text-green-800' : 'text-yellow-800'
+                                                    }`}>
+                                                        {speechResult.message}
+                                                    </div>
+                                                    {speechResult.transcript && (
+                                                        <div className="text-sm text-gray-700">
+                                                            Duyduğum: "<span className="font-semibold">{speechResult.transcript}</span>"
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {!speechResult && !isRecording && (
+                                                <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                                    <div className="text-xs font-semibold text-blue-800 mb-1">💡 İpuçları:</div>
+                                                    <ul className="text-xs text-blue-700 space-y-1">
+                                                        <li>• Butona tıkladıktan sonra hemen konuşmaya başlayın</li>
+                                                        <li>• Net ve yüksek sesle telaffuz edin</li>
+                                                        <li>• Mikrofona yakın olun (20-30cm)</li>
+                                                        <li>• Sessiz bir ortamda deneyin</li>
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
+                                        )}
+
+                                        {/* Cevabı Göster / Devam Et Butonları */}
+                                        {!showAnswer ? (
+                                            <button
+                                                onClick={() => setShowAnswer(true)}
+                                                className="w-full py-4 bg-purple-600 text-white rounded-xl font-bold text-xl hover:bg-purple-700 transition"
+                                            >
+                                                Cevabı Göster
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={handleNext}
+                                                className="w-full py-4 bg-green-500 text-white rounded-xl font-bold text-xl hover:bg-green-600 transition"
+                                            >
+                                                {currentStep < totalSteps - 1 ? 'Devam Et' : 'Alıştırmaya Geç'}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            // Alıştırma Ekranı
+            const ExerciseScreen = () => {
+                const [questions, setQuestions] = useState([]);
+                const [currentQ, setCurrentQ] = useState(0);
+                const [selectedAnswer, setSelectedAnswer] = useState(null);
+                const [isCorrect, setIsCorrect] = useState(null);
+                const [score, setScore] = useState(0);
+                const [showResults, setShowResults] = useState(false);
+                const isChild = userProfile === 'child';
+
+                useEffect(() => {
+                    generateQuestions();
+                }, []);
+
+                const generateQuestions = () => {
+                    const content = currentLesson.type === 'vocabulary' ? currentLesson.words : currentLesson.sentences;
+                    const generatedQuestions = [];
+
+                    // Her kelime/cümle için bir soru oluştur
+                    content.forEach(item => {
+                        // Tip 1: İngilizce ver, Türkçe sor
+                        const q1 = {
+                            question: currentLesson.type === 'vocabulary' ? 
+                                `"${item.en}" kelimesinin Türkçesi nedir?` :
+                                `"${item.en}" cümlesinin Türkçesi nedir?`,
+                            correct: item.tr,
+                            options: generateOptions(item.tr, content, 'tr')
+                        };
+                        generatedQuestions.push(q1);
+
+                        // Tip 2: Türkçe ver, İngilizce sor
+                        const q2 = {
+                            question: currentLesson.type === 'vocabulary' ?
+                                `"${item.tr}" kelimesinin İngilizcesi nedir?` :
+                                `"${item.tr}" cümlesinin İngilizcesi nedir?`,
+                            correct: item.en,
+                            options: generateOptions(item.en, content, 'en')
+                        };
+                        generatedQuestions.push(q2);
+                    });
+
+                    // Soruları karıştır
+                    setQuestions(shuffleArray(generatedQuestions).slice(0, 10));
+                };
+
+                const generateOptions = (correct, allItems, lang) => {
+                    const options = [correct];
+                    const otherOptions = allItems
+                        .map(item => item[lang])
+                        .filter(item => item !== correct);
+                    
+                    while (options.length < 4 && otherOptions.length > 0) {
+                        const randomIndex = Math.floor(Math.random() * otherOptions.length);
+                        options.push(otherOptions[randomIndex]);
+                        otherOptions.splice(randomIndex, 1);
+                    }
+                    
+                    return shuffleArray(options);
+                };
+
+                const shuffleArray = (array) => {
+                    const newArray = [...array];
+                    for (let i = newArray.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+                    }
+                    return newArray;
+                };
+
+                const handleAnswer = (answer) => {
+                    if (selectedAnswer !== null) return;
+
+                    setSelectedAnswer(answer);
+                    const correct = answer === questions[currentQ].correct;
+                    setIsCorrect(correct);
+
+                    if (correct) {
+                        setScore(score + 10);
+                        setUserProgress({
+                            ...userProgress,
+                            totalXP: userProgress.totalXP + 10
+                        });
+                    }
+
+                    setTimeout(() => {
+                        if (currentQ < questions.length - 1) {
+                            setCurrentQ(currentQ + 1);
+                            setSelectedAnswer(null);
+                            setIsCorrect(null);
+                        } else {
+                            setShowResults(true);
+                        }
+                    }, 1500);
+                };
+
+                // Çocuk modu için soruyu sesli oku
+                const speakQuestion = (questionText) => {
+                    if (isChild) {
+                        speak(questionText, 'tr-TR'); // Türkçe ses
+                    }
+                };
+
+                // Soru değiştiğinde sesli oku
+                useEffect(() => {
+                    if (isChild && questions.length > 0 && !showResults) {
+                        setTimeout(() => {
+                            speakQuestion(questions[currentQ].question);
+                        }, 500);
+                    }
+                }, [currentQ, questions]);
+
+                if (questions.length === 0) {
+                    return <div className="min-h-screen flex items-center justify-center">
+                        <div className="text-2xl">Sorular hazırlanıyor...</div>
+                    </div>;
+                }
+
+                if (showResults) {
+                    const percentage = (score / (questions.length * 10)) * 100;
+
+                    return (
+                        <div className={`min-h-screen flex items-center justify-center p-4 ${isChild ? 'bg-gradient-to-br from-yellow-300 via-pink-300 to-purple-400' : 'gradient-bg'}`}>
+                            <div className="bg-white rounded-3xl shadow-2xl p-12 max-w-2xl w-full text-center fade-in">
+                                <div className="text-7xl mb-6">
+                                    {isChild
+                                        ? (percentage >= 80 ? '🎉🌟⭐' : percentage >= 60 ? '👍🎈' : '💪🎮')
+                                        : (percentage >= 80 ? '🎉' : percentage >= 60 ? '👍' : '💪')
+                                    }
+                                </div>
+                                <h2 className={`text-4xl font-bold mb-4 ${isChild ? 'text-purple-600' : 'text-gray-800'}`}>
+                                    {isChild ? 'Harikasın!' : 'Tebrikler!'}
+                                </h2>
+                                <div className={`text-6xl font-bold mb-6 ${isChild ? 'text-pink-500' : 'text-purple-600'}`}>
+                                    {score} / {questions.length * 10} {isChild && '⭐'}
+                                </div>
+                                <div className="text-2xl text-gray-600 mb-8">
+                                    {isChild
+                                        ? (percentage >= 80 ? 'Süpersin! 🎉' : percentage >= 60 ? 'Çok iyi! 👏' : 'Tekrar deneyelim! 🎮')
+                                        : (percentage >= 80 ? 'Harika bir performans!' : percentage >= 60 ? 'İyi iş çıkardın!' : 'Daha fazla pratik yapmalısın!')
+                                    }
+                                </div>
+                                
+                                <div className="bg-gradient-to-r from-purple-100 to-blue-100 rounded-2xl p-6 mb-8">
+                                    <div className="text-xl font-semibold mb-2">Kazandığın Ödüller:</div>
+                                    <div className="flex justify-center space-x-8 text-lg">
+                                        <div>🏆 +50 XP (Ders)</div>
+                                        <div>⭐ +{score} XP (Alıştırma)</div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <button
+                                        onClick={() => setCurrentScreen('units')}
+                                        className="w-full py-4 bg-purple-600 text-white rounded-xl font-bold text-xl hover:bg-purple-700 transition"
+                                    >
+                                        Derslere Dön
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            generateQuestions();
+                                            setCurrentQ(0);
+                                            setScore(0);
+                                            setShowResults(false);
+                                        }}
+                                        className="w-full py-4 bg-gray-200 text-gray-800 rounded-xl font-bold text-xl hover:bg-gray-300 transition"
+                                    >
+                                        Tekrar Dene
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                }
+
+                const question = questions[currentQ];
+
+                return (
+                    <div className={`min-h-screen ${isChild ? 'bg-gradient-to-br from-blue-100 to-purple-100' : 'bg-gray-50'}`}>
+                        <div className={`text-white p-6 ${isChild ? 'bg-gradient-to-r from-pink-400 to-purple-500' : 'gradient-bg'}`}>
+                            <div className="container mx-auto">
+                                <div className="flex justify-between items-center mb-4">
+                                    <div className="text-xl font-bold">
+                                        {isChild ? '🎯' : ''} Soru {currentQ + 1} / {questions.length}
+                                    </div>
+                                    <div className="text-xl font-bold">
+                                        {isChild ? '⭐' : '💎'} {score} puan
+                                    </div>
+                                </div>
+                                <div className="bg-white bg-opacity-20 rounded-full h-3">
+                                    <div
+                                        className="bg-white h-full rounded-full progress-bar"
+                                        style={{width: `${((currentQ + 1) / questions.length) * 100}%`}}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="container mx-auto px-4 py-12">
+                            <div className="max-w-3xl mx-auto">
+                                <div className={`rounded-3xl shadow-2xl p-8 mb-8 ${isChild ? 'bg-gradient-to-br from-yellow-50 to-pink-50 border-4 border-purple-300' : 'bg-white'}`}>
+                                    <div className="flex items-center justify-center gap-4 mb-8">
+                                        <h2 className={`text-3xl font-bold text-center ${isChild ? 'text-purple-700' : 'text-gray-800'}`}>
+                                            {question.question}
+                                        </h2>
+                                        {isChild && (
+                                            <button
+                                                onClick={() => speakQuestion(question.question)}
+                                                className="bg-gradient-to-r from-green-400 to-blue-500 hover:from-green-500 hover:to-blue-600 text-white p-4 rounded-full transition transform hover:scale-110 shadow-lg"
+                                                title="Soruyu tekrar dinle"
+                                            >
+                                                <span className="text-3xl">🔊</span>
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {question.options.map((option, index) => {
+                                            let bgColor = isChild
+                                                ? 'bg-gradient-to-r from-blue-200 to-purple-200 hover:from-blue-300 hover:to-purple-300'
+                                                : 'bg-gray-100 hover:bg-gray-200';
+
+                                            if (selectedAnswer !== null) {
+                                                if (option === question.correct) {
+                                                    bgColor = isChild
+                                                        ? 'bg-gradient-to-r from-green-400 to-green-500 text-white border-4 border-yellow-400'
+                                                        : 'bg-green-500 text-white';
+                                                } else if (option === selectedAnswer) {
+                                                    bgColor = isChild
+                                                        ? 'bg-gradient-to-r from-red-400 to-red-500 text-white shake'
+                                                        : 'bg-red-500 text-white shake';
+                                                } else {
+                                                    bgColor = 'bg-gray-200';
+                                                }
+                                            }
+
+                                            return (
+                                                <button
+                                                    key={index}
+                                                    onClick={() => handleAnswer(option)}
+                                                    disabled={selectedAnswer !== null}
+                                                    className={`p-6 rounded-xl font-semibold text-lg transition transform ${bgColor} ${
+                                                        selectedAnswer === null ? 'cursor-pointer hover:scale-105' : 'cursor-default'
+                                                    } ${isChild ? 'text-2xl shadow-lg' : ''}`}
+                                                >
+                                                    {isChild && '🎯 '}{option}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {isCorrect !== null && (
+                                        <div className={`mt-8 p-6 rounded-xl text-center text-xl font-bold ${
+                                            isCorrect ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                        }`}>
+                                            {isCorrect ? '✓ Doğru! +10 XP' : '✗ Yanlış! Doğru cevap: ' + question.correct}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            // Dinleme Testi Ekranı
+            const ListeningTestScreen = () => {
+                const [questions, setQuestions] = useState([]);
+                const [currentQ, setCurrentQ] = useState(0);
+                const [selectedAnswer, setSelectedAnswer] = useState(null);
+                const [isCorrect, setIsCorrect] = useState(null);
+                const [score, setScore] = useState(0);
+                const [showResults, setShowResults] = useState(false);
+                const [hasPlayed, setHasPlayed] = useState(false);
+
+                useEffect(() => {
+                    generateListeningQuestions();
+                }, []);
+
+                const generateListeningQuestions = () => {
+                    const allWords = [];
+
+                    // Tüm kelime derslerinden kelimeleri topla
+                    Object.keys(lessonsDatabase).forEach(level => {
+                        lessonsDatabase[level].units.forEach(unit => {
+                            unit.lessons.forEach(lesson => {
+                                if (lesson.type === 'vocabulary' && lesson.words) {
+                                    allWords.push(...lesson.words);
+                                }
+                            });
+                        });
+                    });
+
+                    // Rastgele 10 kelime seç
+                    const selectedWords = shuffleArray(allWords).slice(0, 10);
+
+                    const generatedQuestions = selectedWords.map(word => ({
+                        word: word.en,
+                        correctImage: word.image,
+                        correctTranslation: word.tr,
+                        options: generateImageOptions(word, allWords)
+                    }));
+
+                    setQuestions(generatedQuestions);
+                };
+
+                const generateImageOptions = (correctWord, allWords) => {
+                    const options = [{ tr: correctWord.tr, image: correctWord.image, en: correctWord.en }];
+
+                    const otherWords = allWords.filter(w => w.en !== correctWord.en);
+                    const shuffled = shuffleArray(otherWords);
+
+                    for (let i = 0; i < 3 && i < shuffled.length; i++) {
+                        options.push({ tr: shuffled[i].tr, image: shuffled[i].image, en: shuffled[i].en });
+                    }
+
+                    return shuffleArray(options);
+                };
+
+                const shuffleArray = (array) => {
+                    const newArray = [...array];
+                    for (let i = newArray.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+                    }
+                    return newArray;
+                };
+
+                const playWord = () => {
+                    speak(questions[currentQ].word);
+                    setHasPlayed(true);
+                };
+
+                const handleAnswer = (answer) => {
+                    if (selectedAnswer !== null) return;
+
+                    setSelectedAnswer(answer);
+                    const correct = answer.en === questions[currentQ].word;
+                    setIsCorrect(correct);
+
+                    if (correct) {
+                        setScore(score + 10);
+                        setUserProgress({
+                            ...userProgress,
+                            totalXP: userProgress.totalXP + 10
+                        });
+                    }
+
+                    setTimeout(() => {
+                        if (currentQ < questions.length - 1) {
+                            setCurrentQ(currentQ + 1);
+                            setSelectedAnswer(null);
+                            setIsCorrect(null);
+                            setHasPlayed(false);
+                        } else {
+                            setShowResults(true);
+                        }
+                    }, 2000);
+                };
+
+                if (questions.length === 0) {
+                    return (
+                        <div className="min-h-screen flex items-center justify-center">
+                            <div className="text-2xl">Sorular hazırlanıyor...</div>
+                        </div>
+                    );
+                }
+
+                if (showResults) {
+                    const percentage = (score / (questions.length * 10)) * 100;
+
+                    return (
+                        <div className="min-h-screen gradient-bg flex items-center justify-center p-4">
+                            <div className="bg-white rounded-3xl shadow-2xl p-12 max-w-2xl w-full text-center fade-in">
+                                <div className="text-7xl mb-6">
+                                    {percentage >= 80 ? '🎉🎧' : percentage >= 60 ? '👂👍' : '💪📚'}
+                                </div>
+                                <h2 className="text-4xl font-bold text-gray-800 mb-4">Dinleme Testi Tamamlandı!</h2>
+                                <div className="text-6xl font-bold text-blue-600 mb-6">{score} / {questions.length * 10}</div>
+                                <div className="text-2xl text-gray-600 mb-8">
+                                    {percentage >= 80 ? 'Harika dinleme becerisi!' :
+                                     percentage >= 60 ? 'İyi bir performans!' :
+                                     'Daha fazla dinleme pratiği yap!'}
+                                </div>
+
+                                <div className="bg-gradient-to-r from-blue-100 to-cyan-100 rounded-2xl p-6 mb-8">
+                                    <div className="text-xl font-semibold mb-2">Kazandığın XP:</div>
+                                    <div className="text-3xl font-bold text-blue-600">+{score} XP</div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <button
+                                        onClick={() => setCurrentScreen('home')}
+                                        className="w-full py-4 bg-purple-600 text-white rounded-xl font-bold text-xl hover:bg-purple-700 transition"
+                                    >
+                                        Ana Sayfaya Dön
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            generateListeningQuestions();
+                                            setCurrentQ(0);
+                                            setScore(0);
+                                            setShowResults(false);
+                                            setHasPlayed(false);
+                                        }}
+                                        className="w-full py-4 bg-blue-500 text-white rounded-xl font-bold text-xl hover:bg-blue-600 transition"
+                                    >
+                                        Tekrar Dene
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                }
+
+                const question = questions[currentQ];
+
+                return (
+                    <div className="min-h-screen bg-gray-50">
+                        <div className="gradient-bg text-white p-6">
+                            <button
+                                onClick={() => setCurrentScreen('home')}
+                                className="mb-4 px-4 py-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 transition"
+                            >
+                                ← Geri
+                            </button>
+                            <div className="container mx-auto">
+                                <div className="flex justify-between items-center mb-4">
+                                    <div className="text-xl font-bold">Soru {currentQ + 1} / {questions.length}</div>
+                                    <div className="text-xl font-bold">🎧 {score} puan</div>
+                                </div>
+                                <div className="bg-white bg-opacity-20 rounded-full h-3">
+                                    <div
+                                        className="bg-white h-full rounded-full progress-bar"
+                                        style={{width: `${((currentQ + 1) / questions.length) * 100}%`}}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="container mx-auto px-4 py-12">
+                            <div className="max-w-4xl mx-auto">
+                                <div className="bg-white rounded-3xl shadow-2xl p-8 mb-8">
+                                    <h2 className="text-3xl font-bold text-gray-800 text-center mb-6">
+                                        👂 Dinleme Testi
+                                    </h2>
+                                    <p className="text-center text-gray-600 mb-8">
+                                        Ses butonuna tıklayın ve duyduğunuz kelimeyi gösteren görseli seçin
+                                    </p>
+
+                                    {/* Ses Çalma Butonu */}
+                                    <div className="text-center mb-8">
+                                        <button
+                                            onClick={playWord}
+                                            className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-12 py-6 rounded-2xl font-bold text-2xl hover:scale-105 transition transform shadow-lg"
+                                        >
+                                            🔊 {hasPlayed ? 'Tekrar Dinle' : 'Kelimeyi Dinle'}
+                                        </button>
+                                    </div>
+
+                                    {/* Cevap Seçenekleri */}
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        {question.options.map((option, index) => {
+                                            let borderColor = 'border-gray-300';
+                                            let bgColor = 'bg-white hover:bg-gray-50';
+
+                                            if (selectedAnswer !== null) {
+                                                if (option.en === question.word) {
+                                                    borderColor = 'border-green-500 border-4';
+                                                    bgColor = 'bg-green-100';
+                                                } else if (option.en === selectedAnswer.en) {
+                                                    borderColor = 'border-red-500 border-4';
+                                                    bgColor = 'bg-red-100 shake';
+                                                }
+                                            }
+
+                                            return (
+                                                <button
+                                                    key={index}
+                                                    onClick={() => handleAnswer(option)}
+                                                    disabled={selectedAnswer !== null}
+                                                    className={`p-6 rounded-xl border-2 ${borderColor} ${bgColor} transition cursor-pointer`}
+                                                >
+                                                    <div className="text-6xl mb-3">{option.image}</div>
+                                                    <div className="font-semibold text-gray-800">{option.tr}</div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Geri Bildirim */}
+                                    {isCorrect !== null && (
+                                        <div className={`mt-8 p-6 rounded-xl text-center text-xl font-bold ${
+                                            isCorrect ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                        }`}>
+                                            {isCorrect
+                                                ? `✓ Harika! Doğru cevap: "${question.word}" +10 XP`
+                                                : `✗ Yanlış! Doğru cevap: "${question.word}" (${question.correctTranslation})`
+                                            }
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            // Ekran yönlendirmesi
+            return (
+                <>
+                    {currentScreen === 'profile' && <ProfileSelectionScreen />}
+                    {currentScreen === 'home' && <HomeScreen />}
+                    {currentScreen === 'units' && <UnitsScreen />}
+                    {currentScreen === 'lesson' && <LessonScreen />}
+                    {currentScreen === 'exercise' && <ExerciseScreen />}
+                    {currentScreen === 'listening' && <ListeningTestScreen />}
+                </>
+            );
+        }
+
+        // Uygulamayı başlat
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<AlyaGoApp />);
+    </script>
+</body>
+</html>
