@@ -106,15 +106,60 @@
         }
 
         .character-face {
-            border-radius: 50%;
-            border: 5px solid #fff;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
-            animation: head-tilt 3s infinite;
+            border-radius: 45% 45% 48% 48% / 50% 50% 45% 45%;
+            border: 6px solid #fff;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            animation: head-tilt 3s infinite, face-glow 2s infinite;
+            position: relative;
+            overflow: hidden;
+            clip-path: ellipse(48% 50% at 50% 45%);
         }
 
         @keyframes head-tilt {
             0%, 100% { transform: rotate(-2deg) scale(1); }
             50% { transform: rotate(2deg) scale(1.02); }
+        }
+
+        @keyframes face-glow {
+            0%, 100% { box-shadow: 0 8px 20px rgba(0,0,0,0.4); }
+            50% { box-shadow: 0 8px 30px rgba(255,215,0,0.6), 0 0 20px rgba(255,215,0,0.4); }
+        }
+
+        /* Yüz animasyonları - Göz kırpma efekti */
+        .character-face::before,
+        .character-face::after {
+            content: '';
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 50%;
+            animation: blink 4s infinite;
+        }
+
+        /* Sol göz */
+        .character-face::before {
+            width: 12%;
+            height: 8%;
+            top: 35%;
+            left: 28%;
+        }
+
+        /* Sağ göz */
+        .character-face::after {
+            width: 12%;
+            height: 8%;
+            top: 35%;
+            right: 28%;
+        }
+
+        @keyframes blink {
+            0%, 48%, 52%, 100% {
+                height: 8%;
+                top: 35%;
+            }
+            50% {
+                height: 2%;
+                top: 38%;
+            }
         }
 
         /* Karakter vücudu SVG stilleri */
@@ -631,6 +676,90 @@
                 name: 'Köpek',
                 emoji: '🐶',
                 colors: { primary: '#8B4513', secondary: '#CD853F', accent: '#DEB887' }
+            },
+            {
+                id: 'panda',
+                name: 'Panda',
+                emoji: '🐼',
+                colors: { primary: '#000000', secondary: '#FFFFFF', accent: '#D0D0D0' }
+            },
+            {
+                id: 'lion',
+                name: 'Aslan',
+                emoji: '🦁',
+                colors: { primary: '#FFA500', secondary: '#FFD700', accent: '#FFE5B4' }
+            },
+            {
+                id: 'penguin',
+                name: 'Penguen',
+                emoji: '🐧',
+                colors: { primary: '#000000', secondary: '#FFFFFF', accent: '#87CEEB' }
+            },
+            {
+                id: 'koala',
+                name: 'Koala',
+                emoji: '🐨',
+                colors: { primary: '#808080', secondary: '#A9A9A9', accent: '#D3D3D3' }
+            },
+            {
+                id: 'fox',
+                name: 'Tilki',
+                emoji: '🦊',
+                colors: { primary: '#FF6347', secondary: '#FF7F50', accent: '#FFA07A' }
+            },
+            {
+                id: 'owl',
+                name: 'Baykuş',
+                emoji: '🦉',
+                colors: { primary: '#8B4513', secondary: '#D2691E', accent: '#DEB887' }
+            },
+            {
+                id: 'butterfly',
+                name: 'Kelebek',
+                emoji: '🦋',
+                colors: { primary: '#FF1493', secondary: '#FF69B4', accent: '#FFB6C1' }
+            },
+            {
+                id: 'frog',
+                name: 'Kurbağa',
+                emoji: '🐸',
+                colors: { primary: '#32CD32', secondary: '#7CFC00', accent: '#ADFF2F' }
+            },
+            {
+                id: 'monkey',
+                name: 'Maymun',
+                emoji: '🐵',
+                colors: { primary: '#8B4513', secondary: '#D2691E', accent: '#F4A460' }
+            },
+            {
+                id: 'tiger',
+                name: 'Kaplan',
+                emoji: '🐯',
+                colors: { primary: '#FF8C00', secondary: '#FFA500', accent: '#FFB84D' }
+            },
+            {
+                id: 'rabbit',
+                name: 'Tavşan',
+                emoji: '🐰',
+                colors: { primary: '#FFB6C1', secondary: '#FFC0CB', accent: '#FFE4E1' }
+            },
+            {
+                id: 'elephant',
+                name: 'Fil',
+                emoji: '🐘',
+                colors: { primary: '#708090', secondary: '#778899', accent: '#B0C4DE' }
+            },
+            {
+                id: 'giraffe',
+                name: 'Zürafa',
+                emoji: '🦒',
+                colors: { primary: '#DAA520', secondary: '#F0E68C', accent: '#FAFAD2' }
+            },
+            {
+                id: 'zombie',
+                name: 'Zombi',
+                emoji: '🧟',
+                colors: { primary: '#556B2F', secondary: '#6B8E23', accent: '#9ACD32' }
             }
         ];
 
@@ -749,48 +878,106 @@
 
             // SVG Karakter Vücudu Bileşeni
             const CharacterBody = ({ character, size = 'normal', showAnimations = true }) => {
-                const width = size === 'large' ? 200 : 140;
-                const height = size === 'large' ? 280 : 200;
+                const width = size === 'large' ? 220 : 160;
+                const height = size === 'large' ? 320 : 240;
                 const colors = character.colors;
+                const scale = size === 'large' ? 1 : 0.72;
 
-                const scale = size === 'large' ? 1 : 0.7;
+                // Karaktere göre özel vücut oluştur
+                const renderCharacterBody = () => {
+                    const cx = width / 2;
+
+                    // Robot karakteri
+                    if (character.id === 'robot') {
+                        return (
+                            <>
+                                {/* Robot Gövde - Kutu */}
+                                <defs>
+                                    <linearGradient id="robotGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                        <stop offset="0%" stopColor={colors.secondary} />
+                                        <stop offset="100%" stopColor={colors.primary} />
+                                    </linearGradient>
+                                </defs>
+                                <rect x={cx-50*scale} y={height*0.45} width={100*scale} height={110*scale} rx={15*scale} fill="url(#robotGrad)" stroke="#333" strokeWidth={3*scale} />
+                                {/* Ekran */}
+                                <rect x={cx-35*scale} y={height*0.5} width={70*scale} height={45*scale} rx={8*scale} fill="#00FFFF" opacity="0.8" />
+                                {/* Anten */}
+                                <line x1={cx} y1={height*0.38} x2={cx} y2={height*0.45} stroke="#333" strokeWidth={4*scale} />
+                                <circle cx={cx} cy={height*0.36} r={8*scale} fill={colors.accent} stroke="#333" strokeWidth={2*scale} />
+                                {/* Kollar - Mekanik */}
+                                <g className={showAnimations ? 'arm-left' : ''}>
+                                    <rect x={cx-70*scale} y={height*0.52} width={18*scale} height={60*scale} rx={9*scale} fill={colors.secondary} stroke="#333" strokeWidth={2*scale} />
+                                    <circle cx={cx-61*scale} cy={height*0.7} r={12*scale} fill={colors.accent} stroke="#333" strokeWidth={2*scale} />
+                                </g>
+                                <g className={showAnimations ? 'arm-right' : ''}>
+                                    <rect x={cx+52*scale} y={height*0.52} width={18*scale} height={60*scale} rx={9*scale} fill={colors.secondary} stroke="#333" strokeWidth={2*scale} />
+                                    <circle cx={cx+61*scale} cy={height*0.7} r={12*scale} fill={colors.accent} stroke="#333" strokeWidth={2*scale} />
+                                </g>
+                                {/* Bacaklar */}
+                                <g className={showAnimations ? 'leg-left' : ''}>
+                                    <rect x={cx-38*scale} y={height*0.75} width={22*scale} height={70*scale} rx={11*scale} fill={colors.primary} stroke="#333" strokeWidth={2*scale} />
+                                    <rect x={cx-42*scale} y={height*0.88} width={30*scale} height={20*scale} rx={5*scale} fill={colors.accent} stroke="#333" strokeWidth={2*scale} />
+                                </g>
+                                <g className={showAnimations ? 'leg-right' : ''}>
+                                    <rect x={cx+16*scale} y={height*0.75} width={22*scale} height={70*scale} rx={11*scale} fill={colors.primary} stroke="#333" strokeWidth={2*scale} />
+                                    <rect x={cx+12*scale} y={height*0.88} width={30*scale} height={20*scale} rx={5*scale} fill={colors.accent} stroke="#333" strokeWidth={2*scale} />
+                                </g>
+                                {/* Boyun */}
+                                <rect x={cx-18*scale} y={height*0.4} width={36*scale} height={30*scale} rx={18*scale} fill="#C0C0C0" stroke="#333" strokeWidth={2*scale} />
+                            </>
+                        );
+                    }
+
+                    // Varsayılan vücut (eski stil ama daha iyi)
+                    return (
+                        <>
+                            <defs>
+                                <linearGradient id={`bodyGrad-${character.id}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" stopColor={colors.secondary} />
+                                    <stop offset="50%" stopColor={colors.primary} />
+                                    <stop offset="100%" stopColor={colors.secondary} />
+                                </linearGradient>
+                                <radialGradient id={`shine-${character.id}`}>
+                                    <stop offset="0%" stopColor="#ffffff" stopOpacity="0.4" />
+                                    <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+                                </radialGradient>
+                            </defs>
+                            {/* Gövde - 3D efekti */}
+                            <ellipse cx={cx} cy={height*0.6} rx={65*scale} ry={75*scale} fill={`url(#bodyGrad-${character.id})`} />
+                            <ellipse cx={cx} cy={height*0.58} rx={55*scale} ry={65*scale} fill={`url(#shine-${character.id})`} />
+                            {/* Boyun */}
+                            <rect x={cx-18*scale} y={height*0.38} width={36*scale} height={30*scale} rx={18*scale} fill="#FFCC99" />
+                            {/* Kollar */}
+                            <g className={showAnimations ? 'arm-left' : ''}>
+                                <ellipse cx={cx-55*scale} cy={height*0.55} rx={18*scale} ry={50*scale} fill={colors.secondary} transform={`rotate(-15 ${cx-55*scale} ${height*0.55})`} />
+                                <ellipse cx={cx-55*scale} cy={height*0.52} rx={14*scale} ry={40*scale} fill={`url(#shine-${character.id})`} transform={`rotate(-15 ${cx-55*scale} ${height*0.52})`} />
+                                <circle cx={cx-62*scale} cy={height*0.68} r={14*scale} fill={colors.accent} />
+                            </g>
+                            <g className={showAnimations ? 'arm-right' : ''}>
+                                <ellipse cx={cx+55*scale} cy={height*0.55} rx={18*scale} ry={50*scale} fill={colors.secondary} transform={`rotate(15 ${cx+55*scale} ${height*0.55})`} />
+                                <ellipse cx={cx+55*scale} cy={height*0.52} rx={14*scale} ry={40*scale} fill={`url(#shine-${character.id})`} transform={`rotate(15 ${cx+55*scale} ${height*0.52})`} />
+                                <circle cx={cx+62*scale} cy={height*0.68} r={14*scale} fill={colors.accent} />
+                            </g>
+                            {/* Bacaklar */}
+                            <g className={showAnimations ? 'leg-left' : ''}>
+                                <ellipse cx={cx-28*scale} cy={height*0.85} rx={20*scale} ry={40*scale} fill={colors.primary} />
+                                <circle cx={cx-28*scale} cy={height*0.96} r={16*scale} fill={colors.accent} />
+                            </g>
+                            <g className={showAnimations ? 'leg-right' : ''}>
+                                <ellipse cx={cx+28*scale} cy={height*0.85} rx={20*scale} ry={40*scale} fill={colors.primary} />
+                                <circle cx={cx+28*scale} cy={height*0.96} r={16*scale} fill={colors.accent} />
+                            </g>
+                            {/* Göbek düğmeleri */}
+                            <circle cx={cx} cy={height*0.55} r={6*scale} fill="#FFF" opacity="0.8" />
+                            <circle cx={cx} cy={height*0.62} r={6*scale} fill="#FFF" opacity="0.8" />
+                            <circle cx={cx} cy={height*0.69} r={6*scale} fill="#FFF" opacity="0.8" />
+                        </>
+                    );
+                };
 
                 return (
                     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className={showAnimations ? 'character-body-svg' : ''}>
-                        {/* Gövde */}
-                        <ellipse cx={width/2} cy={height*0.64} rx={60*scale} ry={70*scale} fill={colors.primary} />
-                        <ellipse cx={width/2} cy={height*0.64} rx={50*scale} ry={60*scale} fill={colors.secondary} />
-
-                        {/* Bacaklar */}
-                        <g className={showAnimations ? 'leg-left' : ''}>
-                            <ellipse cx={width/2 - 25*scale} cy={height*0.857} rx={18*scale} ry={35*scale} fill={colors.primary} />
-                            <circle cx={width/2 - 25*scale} cy={height*0.964} r={15*scale} fill={colors.accent} />
-                        </g>
-                        <g className={showAnimations ? 'leg-right' : ''}>
-                            <ellipse cx={width/2 + 25*scale} cy={height*0.857} rx={18*scale} ry={35*scale} fill={colors.primary} />
-                            <circle cx={width/2 + 25*scale} cy={height*0.964} r={15*scale} fill={colors.accent} />
-                        </g>
-
-                        {/* Boyun */}
-                        <rect x={width/2 - 15*scale} y={height*0.429} width={30*scale} height={25*scale} rx={15*scale} fill="#FFCC99" />
-
-                        {/* Kollar */}
-                        <g className={showAnimations ? 'arm-left' : ''}>
-                            <ellipse cx={width/2 - 50*scale} cy={height*0.571} rx={15*scale} ry={45*scale} fill={colors.secondary} transform={`rotate(-20 ${width/2 - 50*scale} ${height*0.571})`} />
-                            <circle cx={width/2 - 58*scale} cy={height*0.679} r={12*scale} fill={colors.accent} />
-                        </g>
-                        <g className={showAnimations ? 'arm-right' : ''}>
-                            <ellipse cx={width/2 + 50*scale} cy={height*0.571} rx={15*scale} ry={45*scale} fill={colors.secondary} transform={`rotate(20 ${width/2 + 50*scale} ${height*0.571})`} />
-                            <circle cx={width/2 + 58*scale} cy={height*0.679} r={12*scale} fill={colors.accent} />
-                        </g>
-
-                        {/* Göbek Detayı */}
-                        <circle cx={width/2} cy={height*0.661} r={8*scale} fill={colors.accent} opacity="0.5" />
-
-                        {/* Düğmeler */}
-                        <circle cx={width/2} cy={height*0.589} r={5*scale} fill="#FFF" />
-                        <circle cx={width/2} cy={height*0.643} r={5*scale} fill="#FFF" />
-                        <circle cx={width/2} cy={height*0.696} r={5*scale} fill="#FFF" />
+                        {renderCharacterBody()}
                     </svg>
                 );
             };
@@ -838,11 +1025,12 @@
                         const video = videoRef.current;
                         const context = canvas.getContext('2d');
 
-                        canvas.width = 250;
-                        canvas.height = 320;
+                        // Daha büyük boyut - gerçek kafa gibi
+                        canvas.width = 200;
+                        canvas.height = 240;
 
-                        // Videoyu canvas'a çiz
-                        context.drawImage(video, 0, 0, 250, 320);
+                        // Videoyu canvas'a çiz (ortalanmış)
+                        context.drawImage(video, 25, 0, 200, 240, 0, 0, 200, 240);
 
                         // Data URL olarak al
                         const photoData = canvas.toDataURL('image/png');
@@ -1033,8 +1221,8 @@
                                                     alt="Karakter"
                                                     className="character-face"
                                                     style={{
-                                                        width: '100px',
-                                                        height: '100px',
+                                                        width: '130px',
+                                                        height: '150px',
                                                         objectFit: 'cover',
                                                         display: 'block'
                                                     }}
@@ -1142,8 +1330,8 @@
                                                     alt="Karakter"
                                                     className="character-face"
                                                     style={{
-                                                        width: '100px',
-                                                        height: '100px',
+                                                        width: '130px',
+                                                        height: '150px',
                                                         objectFit: 'cover',
                                                         display: 'block'
                                                     }}
@@ -2208,8 +2396,8 @@
                                     alt="Karakter"
                                     className="character-face"
                                     style={{
-                                        width: '70px',
-                                        height: '70px',
+                                        width: '95px',
+                                        height: '110px',
                                         objectFit: 'cover',
                                         display: 'block'
                                     }}
