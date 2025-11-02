@@ -797,19 +797,43 @@
                             }
                         });
                         setStream(mediaStream);
+
                         if (videoRef.current) {
                             videoRef.current.srcObject = mediaStream;
 
                             // Video yüklendiğinde ready durumuna geç
-                            videoRef.current.onloadedmetadata = () => {
-                                videoRef.current.play();
-                                setTimeout(() => {
-                                    setVideoReady(true);
-                                }, 500); // Kameranın stabilize olması için kısa bir bekleme
+                            const handleCanPlay = async () => {
+                                try {
+                                    await videoRef.current.play();
+                                    // Biraz bekle ve ready yap
+                                    setTimeout(() => {
+                                        setVideoReady(true);
+                                    }, 800);
+                                } catch (playError) {
+                                    console.error('Video play hatası:', playError);
+                                    // Yine de ready yap, bazı tarayıcılarda autoplay çalışır
+                                    setTimeout(() => {
+                                        setVideoReady(true);
+                                    }, 1000);
+                                }
                             };
+
+                            // Birden fazla event dinle (tarayıcı uyumluluğu için)
+                            videoRef.current.onloadedmetadata = handleCanPlay;
+                            videoRef.current.oncanplay = handleCanPlay;
+
+                            // Güvenlik için timeout: 3 saniye içinde ready olmazsa yine de aç
+                            setTimeout(() => {
+                                if (!videoReady) {
+                                    console.log('Timeout: Kamera zorla açılıyor');
+                                    setVideoReady(true);
+                                }
+                            }, 3000);
                         }
                     } catch (error) {
-                        alert('Kamera erişimi reddedildi. Lütfen tarayıcı ayarlarından kamera iznini verin.');
+                        setVideoReady(false);
+                        setStream(null);
+                        alert('Kamera erişimi reddedildi veya bir hata oluştu. Lütfen tarayıcı ayarlarından kamera iznini verin ve sayfayı yenileyin.');
                         console.error('Kamera hatası:', error);
                     }
                 };
